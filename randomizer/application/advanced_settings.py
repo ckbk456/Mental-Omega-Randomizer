@@ -1429,8 +1429,13 @@ class AdvancedSettingsController:
     def update_mission_goal_limit(self):
         if not self.missions:
             return
-        filtered_count = len(self.filtered_missions_for_seed())
-        self.mission_goal_label.configure(text=f'Missions to finish (max {filtered_count})')
+        candidates = self.filtered_missions_for_seed()
+        flexible = (self.progression_mode_var.get() in {'Grid Mode', 'Mission List'}
+                    and self.mission_pool_selection.get('cooperative_policy') == 'flexible')
+        filtered_count = sum(not mission.get('coop_name') or bool(mission.get('challenge_name'))
+                             for mission in candidates) if flexible else len(candidates)
+        label = 'Solo path goal' if flexible else 'Missions to finish'
+        self.mission_goal_label.configure(text=f'{label} (max {filtered_count})')
         self.campaign_label.configure(text=(
             f'Reward faction ({filtered_count} challenge maps)'
             if self.selected_mission_category() == 'challenge'

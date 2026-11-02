@@ -224,6 +224,34 @@ def create_grid(mission_codes, two_start_positions=False, protect_opening=False)
     return grid
 
 
+def add_optional_branches(grid, mission_codes, parents):
+    """Display human-only bonus maps below a complete solo grid.
+
+    These nodes use explicit parent links rather than positional adjacency.
+    They can reward the party, but cannot become a bridge or the endgoal.
+    """
+    codes = list(mission_codes)
+    if not codes:
+        return grid
+    width = max(1, int(grid['width']))
+    first_row = int(grid['height']) + 1
+    for index, code in enumerate(codes):
+        if code in grid['nodes'] or parents.get(code) not in grid['nodes']:
+            raise ValueError('Optional mission branches require unique maps and valid parents.')
+        grid['nodes'][code] = {
+            'x': index % width,
+            'y': first_row + index // width,
+            'state': LOCKED,
+            'optional': True,
+            'unlock_parent': parents[code],
+        }
+    grid['core_height'] = int(grid['height'])
+    grid['height'] = first_row + (len(codes) + width - 1) // width
+    grid['layout_version'] = 4
+    refresh_states(grid, [])
+    return grid
+
+
 def node_at(grid, x, y):
     for code, node in grid.get('nodes', {}).items():
         if node.get('x') == x and node.get('y') == y:
@@ -232,18 +260,20 @@ def node_at(grid, x, y):
 
 
 def neighbors(grid, code):
-    """Return the orthogonal neighbor IDs of ``code`` in stable grid order."""
+    """Return critical neighbors and any explicit optional child branches."""
     node = grid.get('nodes', {}).get(code)
-    if node is None:
+    if node is None or node.get('optional'):
         return []
     x, y = node['x'], node['y']
-    positions = {(item['x'], item['y']): item_code for item_code, item in grid['nodes'].items()}
-    return [
-        positions[position]
-        for position in ((x, y - 1), (x - 1, y), (x + 1, y), (x, y + 1))
-        if position in positions
-    ]
-
+    positions = {(item['x'], item['y']): item_code
+                 for item_code, item in grid['nodes'].items()
+                 if not item.get('optional')}
+    adjacent = [positions[position]
+                for position in ((x, y - 1), (x - 1, y), (x + 1, y), (x, y + 1))
+                if position in positions]
+    adjacent.extend(child for child, item in grid['nodes'].items()
+                    if item.get('optional') and item.get('unlock_parent') == code)
+    return adjacent
 
 def starting_nodes(grid):
     if not grid.get('two_start_positions'):
@@ -260,6 +290,9 @@ def refresh_states(grid, completed_codes, unlock_all_after_goal=False):
     unlocked = set(starting_nodes(grid))
     for code in completed:
         unlocked.update(neighbors(grid, code))
+    unlocked.update(code for code, node in nodes.items()
+                    if node.get('optional')
+                    and node.get('unlock_parent') in (unlocked | completed))
     if unlock_all_after_goal and grid.get('goal') in completed:
         unlocked.update(nodes)
 
@@ -279,11 +312,11 @@ def completing_unlocks(grid, code, unlock_all_after_goal=False):
             for node_code, node in nodes.items()
             if node_code != code and node.get('state') == LOCKED
         ]
-    return [
-        neighbor
-        for neighbor in neighbors(grid, code)
-        if nodes[neighbor].get('state') == LOCKED
-    ]
+    revealed = set(neighbors(grid, code))
+    revealed.update(child for child, node in nodes.items()
+                    if node.get('optional') and node.get('unlock_parent') in revealed)
+    return [node_code for node_code, node in nodes.items()
+            if node_code in revealed and node.get('state') == LOCKED]
 
 
 def is_complete(grid):

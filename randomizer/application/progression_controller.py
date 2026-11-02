@@ -451,7 +451,8 @@ class ProgressionController:
             self.sync_grid_progression()
             return is_grid_complete(self.state.get('grid', {}))
         goal = self.state.get('mission_goal', len(self.state.get('mission_order', [])))
-        return len(self.state.get('completed_missions', [])) >= goal
+        required = self.state.get('required_mission_order', self.state.get('mission_order', []))
+        return len(set(self.state.get('completed_missions', [])).intersection(required)) >= goal
 
     def mission_tooltip_text(self, row_id):
         if not self.state:

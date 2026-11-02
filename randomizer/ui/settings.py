@@ -715,10 +715,10 @@ def _build_gameplay_settings(self, settings_frame):
     self.settings_intro_label = ttk.Label(
         settings_frame,
         text=(
-            'Gameplay settings are saved for the next generated seed. Existing runs keep '
-            'their generated gameplay settings. Appearance and privacy apply immediately.'
+            'Choose your next run here. Its pool, progression and rewards stay fixed once generated. '
+            'Change your party and challenge houses between missions; appearance applies immediately.'
         ),
-        wraplength=340,
+        wraplength=700,
         style='Muted.TLabel',
     )
     self.settings_intro_label.grid(row=1, column=0, sticky='ew', pady=(8, 8))
@@ -828,6 +828,7 @@ def _build_gameplay_settings(self, settings_frame):
         self.prioritize_no_build_missions_check,
         'Fills protected Mission List/Grid opening positions with easier enabled true-no-build and production-no-build missions first.',
     )
+    self.build_skirmish_pool_control(mission_pool_frame, row=6)
 
     reward_frame = ttk.LabelFrame(settings_frame, text='Reward Pool', padding=(8, 8, 8, 8))
     self.reward_frame = reward_frame

@@ -115,11 +115,15 @@ class LaunchController:
                 if states.get(code) in {GRID_UNLOCKED, GRID_COMPLETED}
             ]
 
-        order = self.state.get('mission_order', [])
-        completed_count = len(self.state.get('completed_missions', []))
+        order = self.state.get('required_mission_order', self.state.get('mission_order', []))
+        completed = set(self.state.get('completed_missions', []))
+        completed_count = len(completed.intersection(order))
         starting_count = self.state.get('starting_unlocked_missions', STARTING_UNLOCKED_MISSIONS)
         open_count = min(len(order), starting_count + completed_count)
-        return order[:open_count]
+        open_codes = order[:open_count]
+        available = set(open_codes) | completed
+        return open_codes + [code for code, parent in self.state.get('optional_mission_parents', {}).items()
+                             if parent in available]
 
     def get_selected_difficulty_value(self):
         return dict(DIFFICULTIES).get(self.difficulty_var.get(), 1)

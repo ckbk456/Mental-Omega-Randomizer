@@ -69,9 +69,9 @@ class CoopConnectionController:
             row=9, column=0, columnspan=2, sticky='w', pady=(8, 0))
         dialog.protocol('WM_DELETE_WINDOW', self._close_coop_dialog)
         ttk.Label(frame, text=(
-            'Choose co-op, or challenge with 2 players, in Settings before connecting. Use the same authorized '
+            'Keep one party while moving between solo and team missions. Use the same authorized '
             'private network (Tailscale or ZeroTier). Guest enters the host’s '
-            'private IPv4 and pairing code. Host generates the Grid first; Shop players '
+            'private IPv4 and pairing code. Host loads a mixed or co-op run first; Shop players '
             'start separate runs with the same seed and stage. Ports are automatic.'
             ' Each challenge player chooses their own house and a different color here. '
             'Host controls game speed and difficulty.'
@@ -181,7 +181,7 @@ class CoopConnectionController:
                 widget.configure(state='disabled' if connected else 'readonly' if isinstance(widget, ttk.Combobox) else 'normal')
         button = getattr(self, '_coop_start_button', None)
         if button and button.winfo_exists():
-            enabled = feature.COOP_FEATURE_ENABLED and self.coop_mode_var.get()
+            enabled = self.party_connection_available()
             button.configure(
                 state='normal' if enabled and not connected else 'disabled',
             )
@@ -202,7 +202,7 @@ class CoopConnectionController:
         return redact_connection_details(value, *private)
 
     def _connect_coop_from_dialog(self):
-        if not feature.COOP_FEATURE_ENABLED or not self.coop_mode_var.get():
+        if not self.party_connection_available():
             return
         self._connect_coop(
             'host' if self._coop_role.get() == 'Host' else 'guest',

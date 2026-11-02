@@ -141,7 +141,7 @@ def build_archipelago_tab(self, workspace_tabs):
         height=16,
         wrap='word',
         state='disabled',
-        font=('Segoe UI', 9),
+        font=('Segoe UI', 10),
     )
     self.archipelago_history_text.grid(row=0, column=0, sticky='nsew')
     self.configure_archipelago_message_tags()

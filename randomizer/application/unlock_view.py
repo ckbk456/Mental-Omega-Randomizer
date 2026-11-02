@@ -452,8 +452,12 @@ class UnlockViewController:
                 self.refresh_progress_side_views()
             return
 
-        completed = len(self.state.get('completed_missions', []))
         order = self.state.get('mission_order', [])
+        required = self.state.get('required_mission_order', order)
+        completed = len(set(self.state.get('completed_missions', [])).intersection(required))
+        bonus_count = len(set(self.state.get('completed_missions', [])).intersection(
+            self.state.get('optional_mission_codes', [])))
+        bonus_text = f' | Bonus co-op: {bonus_count}' if self.state.get('optional_mission_codes') else ''
         unlocked = len([
             code for code in self.unlocked_mission_codes()
             if code not in self.state.get('completed_missions', [])
@@ -474,7 +478,7 @@ class UnlockViewController:
             text=(
                 f'Seed: {self.state.get("seed", "")} | {progression_mode} | '
                 f'Rewards: {self.state.get("reward_mode", REWARD_MODES[0])}\n'
-                f'Completed: {completed}/{goal} | Open: {unlocked} | Rewards: {len(earned)} | {status}'
+                f'Completed: {completed}/{goal}{bonus_text} | Open: {unlocked} | Rewards: {len(earned)} | {status}'
             )
         )
         lines = []

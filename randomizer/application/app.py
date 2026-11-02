@@ -41,6 +41,7 @@ from ._dependencies import (
     valid_choice,
 )
 
+from .run_library_controller import RunLibraryController
 from .window import WindowController
 from .update_controller import UpdateController
 from .state_controller import StateController
@@ -65,6 +66,7 @@ from .progression_battles import ProgressionBattlesController
 
 
 class LauncherApp(
+    RunLibraryController,
     ProgressionBattlesController,
     UpdateController,
     FinalFortressController,
@@ -356,7 +358,7 @@ class LauncherApp(
         )
         self.progression_mode_var = tk.StringVar(value=progression_mode_default)
         category = self.config.get('mission_category')
-        if category not in {'campaign', 'coop', 'challenge'}:
+        if category not in {'campaign', 'coop', 'challenge', 'mixed'}:
             category = 'coop' if self.config.get('coop_mode') else 'campaign'
         self.mission_category_var = tk.StringVar(value=category)
         self.challenge_player_count_var = tk.StringVar(value=str(
@@ -385,6 +387,11 @@ class LauncherApp(
             category == 'coop' or (category == 'challenge'
                                   and self.challenge_player_count_var.get() == '2')
         ))
+        if self.state.get('mission_category') == 'mixed':
+            self.mission_category_var.set('mixed')
+            shop_selected = self.progression_mode_var.get() == 'Shop Mode'
+            self.coop_mode_var.set(bool(shop_selected and self.config.get('shop_coop_mode', False)))
+            self._shop_from_mixed = shop_selected
         if category == 'challenge' and self.progression_mode_var.get() == 'Shop Mode':
             self.progression_mode_var.set('Grid Mode')
         grid_state = self.state.get('grid', {}) if isinstance(self.state.get('grid'), dict) else {}
@@ -575,6 +582,7 @@ class LauncherApp(
         self.busy_depth = 0
         self.ui_queue = queue.Queue()
         self.initialize_challenge_defaults()
+        self.initialize_mission_pool_selection()
         self.initialize_shop_controller()
         self.initialize_final_fortress_controller()
         self.cleanup_generated_root_maps()

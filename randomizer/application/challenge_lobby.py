@@ -79,6 +79,7 @@ class ChallengeLobbyController:
     def challenge_player_choices_locked(self):
         process = getattr(self, 'active_game_process', None)
         return bool(getattr(self, '_coop_busy', False)
+                    or getattr(self, '_challenge_preparing', False)
                     or (process is not None and process.poll() is None))
 
     def on_challenge_player_options_changed(self, _event=None):
@@ -99,7 +100,8 @@ class ChallengeLobbyController:
 
     def publish_challenge_player_options(self):
         lobby = getattr(self, '_coop_lobby', None)
-        if not (lobby and lobby.connected and self.challenges_available()):
+        if not (lobby and lobby.connected and (
+                self.challenges_available() or self.mixed_run_active())):
             return
         message = {'type': 'player_options', **self.own_challenge_player_options()}
         if lobby.role == 'host':
@@ -170,7 +172,7 @@ class ChallengeLobbyController:
         frame = getattr(self, '_coop_player_frame', None)
         if frame is None or not frame.winfo_exists():
             return
-        if not self.challenges_available():
+        if not self.challenges_available() and not self.mixed_run_active():
             frame.grid_remove()
             return
         frame.grid()
@@ -194,7 +196,9 @@ class ChallengeLobbyController:
         else:
             text += '  Waiting for peer choices.'
         text += f'\nHost game speed: {self.game_speed_var.get()}.'
-        if self.challenge_mission():
+        if mission and mission.get('unavailable_locally'):
+            text += '\nThis mission is not installed here. Other installed team missions remain playable.'
+        elif self.challenge_mission():
             try:
                 if peer:
                     self.challenge_pair_options(mission)
@@ -202,6 +206,6 @@ class ChallengeLobbyController:
                     conflicts = self.challenge_player_conflicts(mission, {'You': own})
                     if conflicts:
                         text += '\n' + ' '.join(conflicts)
-            except ValueError as exc:
+            except (OSError, ValueError) as exc:
                 text += '\n' + str(exc)
         self._coop_player_summary.set(text)

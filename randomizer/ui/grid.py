@@ -8,6 +8,14 @@ from randomizer.ui.gradient_label import AnimatedGradientLabel
 from randomizer.ui.tooltips import WidgetTooltip
 
 
+def _fit_tile_text(event):
+    # Use the space actually available after resizing instead of a fixed
+    # narrow wrap that splits long mission names inside otherwise wide tiles.
+    width = max(80, event.width - 18)
+    if int(event.widget.cget('wraplength')) != width:
+        event.widget.configure(wraplength=width)
+
+
 def redraw_grid(self):
     """Rebuild the mission grid only when its topology changes."""
     grid = self.state.get('grid') if self.state else None
@@ -79,16 +87,26 @@ def redraw_grid(self):
         content_frame.columnconfigure(
             column,
             weight=1,
-            minsize=105,
+            minsize=112,
             uniform='grid-column',
         )
     for row in range(height):
         content_frame.rowconfigure(
             row,
             weight=1,
-            minsize=88,
+            minsize=100,
             uniform='grid-row',
         )
+
+    optional_heading_row = grid.get('core_height')
+    if optional_heading_row is not None and int(optional_heading_row) < height:
+        optional_heading_row = int(optional_heading_row)
+        content_frame.rowconfigure(optional_heading_row, weight=0, minsize=44, uniform='')
+        ttk.Label(
+            content_frame,
+            text='OPTIONAL CO-OP  ·  Invite a friend between missions',
+            style='Muted.TLabel', padding=(8, 12),
+        ).grid(row=optional_heading_row, column=0, columnspan=width, sticky='ew')
 
     positions = {
         (node['x'], node['y']): code
@@ -99,6 +117,8 @@ def redraw_grid(self):
     # board instead of allowing an irregular set of widgets to collapse.
     for row in range(height):
         for column in range(width):
+            if row == optional_heading_row:
+                continue
             if (column, row) in positions:
                 continue
             spacer = tk.Frame(
@@ -138,7 +158,7 @@ def redraw_grid(self):
         )
         banner = tk.Label(
             selection_frame,
-            font=('Segoe UI', 7, 'bold'),
+            font=('Segoe UI', 8, 'bold'),
             anchor='center',
             justify='center',
             wraplength=max(74, 520 // max(1, width)),
@@ -153,7 +173,7 @@ def redraw_grid(self):
         )
         body = body_class(
             selection_frame,
-            font=('Segoe UI', 9, 'bold'),
+            font=('Segoe UI', 10, 'bold'),
             justify='center',
             anchor='center',
             wraplength=max(80, 560 // max(1, width)),
@@ -161,6 +181,8 @@ def redraw_grid(self):
             pady=6,
         )
         body.grid(row=1, column=0, sticky='nsew', padx=4, pady=(0, 4))
+        body.bind('<Configure>', _fit_tile_text, add='+')
+        banner.bind('<Configure>', _fit_tile_text, add='+')
         mission_index = index_by_code.get(code, 0)
         for widget in (tile, selection_frame, banner, body):
             widget.bind(

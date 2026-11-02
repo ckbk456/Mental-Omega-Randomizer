@@ -149,6 +149,11 @@ class ArchipelagoYamlController:
         """Export one AP player file from the exact visible launcher controls."""
         if self.gameplay_settings_locked():
             return
+        if (self.progression_mode_var.get() in {'Grid Mode', 'Mission List'}
+                and self.config.get('mission_pool_selection')):
+            from tkinter import messagebox
+            messagebox.showinfo('Archipelago', 'The unified mission pool is available in standalone Grid Mode and Mission List. Archipelago requires its existing campaign or co-op setup.', parent=self)
+            return
         slot_name = self.archipelago_slot_var.get().strip() or 'Commander'
         self.config.setdefault('archipelago', {})['slot_name'] = slot_name
         self.save_current_launcher_config()

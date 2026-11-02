@@ -110,7 +110,8 @@ def expand_legacy_challenge_catalogue(state, missions, *, excluded_codes=()):
         if settings.get('excluded_challenge_mission_codes'):
             return []
     country = state.get('challenge_country')
-    registered = {mission['code']: mission for mission in missions}
+    registered = {mission['code']: mission for mission in missions
+                  if mission.get('mission_category') == 'challenge' or mission.get('challenge_name')}
     compatible = {code for code, mission in registered.items()
                   if country in mission.get('allowed_countries', ())}
     order = state.get('mission_order')

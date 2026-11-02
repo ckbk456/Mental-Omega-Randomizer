@@ -16,17 +16,18 @@ from ._builder_dependencies import (
 from .shop import _tree
 from .coop import build_coop_controls
 from .viewport import ScrollableViewport
+from .mission_pool import build_unified_pool_controls
 
 
 def _build_window_shell(self):
-    main_frame = ttk.Frame(self, padding=(12, 12, 12, 12))
+    main_frame = ttk.Frame(self, padding=(18, 16, 18, 12))
     self.main_frame = main_frame
     main_frame.grid(row=0, column=0, sticky='nsew')
     self.columnconfigure(0, weight=1)
     self.rowconfigure(0, weight=1)
 
     self.style = ttk.Style(self)
-    self.style.configure('Randomizer.TNotebook', tabposition='n')
+    self.style.configure('Randomizer.TNotebook', tabposition='nw')
     self.style.layout('Compact.Randomizer.TNotebook', [('Notebook.client', {'sticky': 'nswe'})])
     self.style.layout('Compact.Randomizer.TNotebook.Tab', [])
     self.style.configure('Randomizer.TNotebook.Tab', padding=(16, 7), font=('Segoe UI', 10, 'bold'))
@@ -43,8 +44,8 @@ def _build_window_shell(self):
 
     header = ttk.Label(
         main_frame,
-        text=f'Mental Omega Randomizer Launcher v{APP_VERSION}',
-        font=('Segoe UI', 14, 'bold'),
+        text=f'Mental Omega Randomizer · {APP_VERSION}',
+        font=('Segoe UI', 19, 'bold'),
     )
     self.header_label = header
     self._compact_window_heading = f'MO Randomizer v{APP_VERSION}'
@@ -67,6 +68,10 @@ def _build_window_shell(self):
         header_actions, text='Views', menu=self.workspace_menu, width=6,
     )
     self.workspace_menu_button.grid(row=0, column=2, sticky='ne', padx=(6, 0))
+    self.run_library_button = ttk.Button(
+        header_actions, text='Run library', command=self.open_run_library,
+    )
+    self.run_library_button.grid(row=0, column=3, sticky='ne', padx=(6, 0))
     self.copy_seed_button = ttk.Button(
         main_frame,
         text='Copy Seed',
@@ -105,7 +110,7 @@ def _build_window_shell(self):
         add='+',
     )
 
-    mission_view_frame = ttk.Frame(workspace_tabs)
+    mission_view_frame = ttk.Frame(workspace_tabs, padding=(10, 12, 10, 10))
     self.mission_view_frame = mission_view_frame
     mission_view_frame.columnconfigure(0, weight=1)
     mission_view_frame.rowconfigure(1, weight=1)
@@ -120,10 +125,10 @@ def _build_window_shell(self):
 
     mission_search_row = ttk.Frame(mission_view_frame)
     mission_search_row.grid(
-        row=0, column=0, columnspan=2, sticky='ew', pady=(0, 6)
+        row=0, column=0, columnspan=2, sticky='ew', pady=(0, 12)
     )
     mission_search_row.columnconfigure(1, weight=1)
-    ttk.Label(mission_search_row, text='Search missions:').grid(
+    ttk.Label(mission_search_row, text='Find a mission', style='Muted.TLabel').grid(
         row=0, column=0, sticky='w', padx=(0, 6)
     )
     self.mission_search_entry = ttk.Entry(
@@ -243,13 +248,23 @@ def _build_window_shell(self):
         command=self.on_launch_selected,
         style='Launch.TButton',
     )
-    self.compact_launch_button.grid(row=0, column=0, sticky='ew', padx=(0, 4), pady=(6, 0))
+    self.compact_launch_button.grid(row=0, column=0, columnspan=2, sticky='ew', pady=(6, 0))
+    self.compact_party_setup_button = ttk.Button(
+        self.compact_action_row, text='Players & speed', command=self.show_party_setup,
+    )
+    self.compact_party_setup_button.grid(
+        row=1, column=0, sticky='ew', padx=(0, 4), pady=(6, 0))
+    WidgetTooltip(
+        self.compact_party_setup_button,
+        'Choose Solo, an AI teammate or a friend, set challenge houses and colors, '
+        'and adjust the host game speed before launching.',
+    )
     compact_complete_button = ttk.Button(
         self.compact_action_row,
         text='Mark Mission Complete',
         command=self.on_debug_mark_complete,
     )
-    compact_complete_button.grid(row=0, column=1, sticky='ew', padx=(4, 0), pady=(6, 0))
+    compact_complete_button.grid(row=1, column=1, sticky='ew', padx=(4, 0), pady=(6, 0))
     self.compact_complete_button = compact_complete_button
     WidgetTooltip(
         compact_complete_button,
@@ -281,7 +296,7 @@ def _build_right_panel(self, main_frame):
     settings_tab.columnconfigure(0, weight=1)
     settings_tab.rowconfigure(0, weight=1)
     self.workspace_tabs.add(settings_tab, text='Settings')
-    viewport = ScrollableViewport(settings_tab, padding=8)
+    viewport = ScrollableViewport(settings_tab, padding=14)
     self.settings_viewport = viewport
     viewport.grid(row=0, column=0, sticky='nsew')
     settings_canvas = viewport.canvas
@@ -309,8 +324,8 @@ def _build_right_panel(self, main_frame):
 
     seed_settings_frame = ttk.LabelFrame(
         settings_frame,
-        text='Seed & Run',
-        padding=(8, 8, 8, 8),
+        text='Run setup',
+        padding=(14, 14, 14, 14),
     )
     self.seed_settings_frame = seed_settings_frame
     seed_settings_frame.grid(row=0, column=0, sticky='ew')
@@ -333,6 +348,7 @@ def _build_right_panel(self, main_frame):
             else 'Generate Seed'
         ),
         command=self.on_new_seed,
+        style='Primary.TButton',
     )
     self.seed_action_button.grid(row=0, column=1, sticky='ew')
     options_row = ttk.Frame(seed_settings_frame)
@@ -349,7 +365,7 @@ def _build_right_panel(self, main_frame):
     )
     self.mission_goal_spinbox.grid(row=0, column=1, sticky='w')
     mission_pool_frame = ttk.LabelFrame(
-        settings_frame, text='Mission Pool', padding=(8, 8, 8, 8),
+        settings_frame, text='Mission pool', padding=(14, 14, 14, 14),
     )
     self.mission_pool_frame = mission_pool_frame
     mission_pool_frame.columnconfigure(1, weight=1)
@@ -364,6 +380,10 @@ def _build_right_panel(self, main_frame):
     )
     self.campaign_combo.grid(row=1, column=1, sticky='ew', pady=(6, 0))
     self.campaign_combo.bind('<<ComboboxSelected>>', self.on_campaign_filter_changed, add='+')
+    build_unified_pool_controls(self, mission_pool_frame)
+    if self.selected_mission_category() == 'mixed':
+        self.campaign_label.grid_remove()
+        self.campaign_combo.grid_remove()
 
     settings_file_row = ttk.Frame(seed_settings_frame)
     settings_file_row.grid(row=3, column=0, sticky='ew', pady=(2, 0))
@@ -840,12 +860,21 @@ def _build_right_panel(self, main_frame):
         style='Launch.TButton',
     )
     self.launch_selected_button.grid(row=0, column=0, sticky='ew', pady=(0, 4))
+    self.party_setup_button = ttk.Button(
+        button_row, text='Players & speed', command=self.show_party_setup,
+    )
+    self.party_setup_button.grid(row=1, column=0, sticky='ew', pady=(0, 4))
+    WidgetTooltip(
+        self.party_setup_button,
+        'Choose Solo, an AI teammate or a friend, set challenge houses and colors, '
+        'and adjust the host game speed before launching.',
+    )
     self.debug_complete_button = ttk.Button(
         button_row,
         text='Mark Mission Complete',
         command=self.on_debug_mark_complete,
     )
-    self.debug_complete_button.grid(row=1, column=0, sticky='ew', pady=(0, 3))
+    self.debug_complete_button.grid(row=2, column=0, sticky='ew', pady=(0, 3))
     WidgetTooltip(
         self.debug_complete_button,
         'Co-op host: record a won mission to unlock the next maps. '
@@ -869,7 +898,7 @@ def _build_info_tabs(self, info_tabs):
         height=16, width=1,
         wrap='word',
         state='disabled',
-        font=('Segoe UI', 9),
+        font=('Segoe UI', 10),
     )
     self.rewards_text.grid(row=1, column=0, sticky='nsew')
 
@@ -979,7 +1008,7 @@ def _build_info_tabs(self, info_tabs):
         height=16, width=1,
         wrap='word',
         state='disabled',
-        font=('Segoe UI', 9),
+        font=('Segoe UI', 10),
     )
     self.unlocks_text.grid(row=1, column=0, sticky='nsew')
     self.unlocks_text.tag_configure('search_match', background='#fff0a6')

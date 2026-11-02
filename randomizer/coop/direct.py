@@ -159,6 +159,9 @@ def _spawn_data(game_root: Path, manifest: dict, *, role: str, name: str,
     own_color = colors[0] if host else colors[1]
     other_color = colors[1] if host and player_count == 2 else colors[0]
     mode_name, handicap = MODES[difficulty]
+    game_speed = manifest.get('game_speed', 2)
+    if type(game_speed) is not int or game_speed not in range(7):
+        raise ValueError('Co-op manifest has an invalid host game speed.')
     sections: dict[str, dict[str, str]] = {
         'Settings': {
             'Name': name, 'Scenario': 'spawnmap.ini', 'UIGameMode': mode_name,
@@ -166,7 +169,7 @@ def _spawn_data(game_root: Path, manifest: dict, *, role: str, name: str,
             'AIPlayers': str(len(enemies) + bool(ai_teammate)), 'Seed': str(game_id),
             'GameID': str(game_id), 'Host': 'Yes' if host else 'No',
             'IsSinglePlayer': 'No', 'Side': str(own_side), 'Color': str(own_color),
-            'IsSpectator': 'No', 'Port': str(local_port), 'GameSpeed': '2',
+            'IsSpectator': 'No', 'Port': str(local_port), 'GameSpeed': str(game_speed),
             'ShortGame': 'No', 'AutoSurrender': 'No', 'BuildOffAlly': 'Yes',
             'FrameSendRate': '7', 'Protocol': '2', 'FogOfWar': 'No',
             'MultiEngineer': 'Yes', 'UnitCount': '0',
@@ -193,6 +196,8 @@ def _spawn_data(game_root: Path, manifest: dict, *, role: str, name: str,
         }
     if manifest.get('mission_category') == 'challenge':
         sections['Settings'].update(manifest['native_settings'])
+    if player_count == 2:
+        sections['Settings']['DisableGameSpeed'] = 'Yes'
     if ai_teammate:
         # CnCNet places computer houses after all human houses, irrespective
         # of color. AIPlayers counts this ally as well as the authored enemies;

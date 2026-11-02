@@ -61,7 +61,12 @@ class WindowController:
         )
 
     def refresh_game_speed_controls(self):
-        """Keep shared launch callbacks compatible; MO has no speed selector."""
+        """The host chooses speed before launch; peers display that value."""
+        locked = self.game_speed_controls_locked()
+        for name in ('game_speed_combo', 'shop_game_speed_combo'):
+            widget = getattr(self, name, None)
+            if widget is not None:
+                widget.configure(state='disabled' if locked else 'readonly')
 
     def on_game_speed_changed(self, _event=None):
         if self.game_speed_controls_locked():
@@ -76,7 +81,7 @@ class WindowController:
         """Show the core selected run settings beneath the launcher title."""
         seed = self.current_display_seed()
         parts = [
-            self.campaign_var.get(),
+            ('Mixed mission pool' if self.state.get('mission_category') == 'mixed' else self.campaign_var.get()),
             self.reward_mode_var.get(),
             self.progression_mode_var.get(),
             self.difficulty_var.get(),
@@ -163,7 +168,7 @@ class WindowController:
         self.subtitle_label.grid_remove() if cramped else self.subtitle_label.grid()
         self.header_label.configure(
             text=self._compact_window_heading if short else self._full_window_heading,
-            font=('Segoe UI', 10 if short else 14, 'bold'),
+            font=('Segoe UI', 11 if short else 19, 'bold'),
         )
         action_width = self.settings_toggle_button.master.winfo_reqwidth()
         text_width = max(160, event.width - action_width - 36)
@@ -175,7 +180,7 @@ class WindowController:
                 width=1 if short else 0,
             )
         text_height = int(self.tk.call('font', 'metrics', 'TkDefaultFont', '-linespace'))
-        for style, minimum in (('Treeview', 22), ('ShopCameo.Treeview', 52),
+        for style, minimum in (('Treeview', 26 if short else 30), ('ShopCameo.Treeview', 52),
                                ('StartingUnlocks.Treeview', 52)):
             self.style.configure(style, rowheight=max(minimum, text_height + 6))
 
@@ -247,7 +252,7 @@ class WindowController:
             'Compact.Randomizer.TNotebook' if cramped else 'Randomizer.TNotebook'))
         self.workspace_menu_button.grid() if compact else self.workspace_menu_button.grid_remove()
         self.style.configure('Randomizer.TNotebook.Tab',
-                             padding=(8, 5) if compact else (16, 7))
+                             padding=(8, 6) if compact else (16, 10))
         split = not compact and not full_workspace and details
         self.main_frame.columnconfigure(0, weight=13 if split else 1,
                                         uniform='content' if split else '')
@@ -618,9 +623,9 @@ class WindowController:
         """Use two Settings columns when workspace width can support them."""
         normal_names = (
             'settings_intro_label',
+            'mission_pool_frame',
             'seed_settings_frame',
             'mission_appearance_column',
-            'mission_pool_frame',
             'reward_frame',
             'arsenal_frame',
             'buff_frame',
@@ -637,7 +642,6 @@ class WindowController:
         self.coop_controls_frame.grid_remove() if shop_mode else self.coop_controls_frame.grid()
         self.shop_coop_row.grid() if shop_mode else self.shop_coop_row.grid_remove()
         left_width = max(self.seed_settings_frame.winfo_reqwidth(),
-                         self.mission_pool_frame.winfo_reqwidth(),
                          self.reward_frame.winfo_reqwidth())
         right_width = max(self.mission_appearance_column.winfo_reqwidth(),
                           self.assistance_frame.winfo_reqwidth(),
@@ -705,46 +709,46 @@ class WindowController:
         )
         if wide:
             self.seed_settings_frame.grid(
-                row=1, column=0, sticky='nsew', padx=(0, 4)
+                row=2, column=0, columnspan=1, sticky='nsew', padx=(0, 8)
             )
             self.mission_appearance_column.grid(
-                row=1, column=1, sticky='new', padx=(4, 0)
+                row=2, column=1, columnspan=1, sticky='new', padx=(8, 0)
             )
             self.mission_pool_frame.grid(
-                row=2, column=0, sticky='nsew', padx=(0, 4), pady=(8, 0)
+                row=1, column=0, columnspan=2, sticky='nsew', padx=0, pady=(8, 16)
             )
             self.assistance_frame.grid(
-                row=2, column=1, sticky='nsew', padx=(4, 0), pady=(8, 0)
+                row=3, column=1, columnspan=1, sticky='nsew', padx=(8, 0), pady=(12, 0)
             )
             self.reward_frame.grid(
                 row=3, column=0, sticky='nsew', padx=(0, 4), pady=(8, 0)
             )
             self.appearance_frame.grid(
-                row=3, column=1, sticky='new', padx=(4, 0), pady=(8, 0)
+                row=4, column=1, columnspan=1, sticky='new', padx=(8, 0), pady=(12, 0)
             )
             self.buff_frame.grid(
-                row=4,
-                column=0,
-                columnspan=2,
-                sticky='nsew',
-                pady=(8, 0),
-            )
-            self.arsenal_frame.grid(
                 row=5,
                 column=0,
                 columnspan=2,
                 sticky='nsew',
                 pady=(8, 0),
             )
-            self.power_buff_frame.grid(
+            self.arsenal_frame.grid(
                 row=6,
                 column=0,
                 columnspan=2,
                 sticky='nsew',
                 pady=(8, 0),
             )
-            self.weight_settings_frame.grid(
+            self.power_buff_frame.grid(
                 row=7,
+                column=0,
+                columnspan=2,
+                sticky='nsew',
+                pady=(8, 0),
+            )
+            self.weight_settings_frame.grid(
+                row=8,
                 column=0,
                 columnspan=2,
                 sticky='nsew',
@@ -753,7 +757,7 @@ class WindowController:
         else:
             normal_widgets = [getattr(self, name) for name in normal_names]
             for row, widget in enumerate(normal_widgets[1:], start=1):
-                widget.grid(row=row, column=0, sticky='ew', pady=(8, 0))
+                widget.grid(row=row, column=0, columnspan=1, sticky='ew', padx=0, pady=(12, 0))
         if self.reward_mode_var.get() != 'Randomizer Arsenal':
             self.arsenal_frame.grid_remove()
         for frame, checks in (

@@ -9,7 +9,7 @@ from ._builder_dependencies import (
 )
 
 def _build_log_and_overlay(self, main_frame):
-    self.status_label = ttk.Label(main_frame, text='Ready', anchor='w')
+    self.status_label = ttk.Label(main_frame, text='Ready', anchor='w', style='Muted.TLabel')
     self.status_label.grid(row=7, column=0, columnspan=2, sticky='ew', pady=(8, 0))
 
     log_header = ttk.Frame(main_frame)
@@ -23,7 +23,7 @@ def _build_log_and_overlay(self, main_frame):
     )
     self.log_toggle_button.grid(row=0, column=0, sticky='w')
     diagnostics_label = ttk.Label(
-        log_header, text=f'Persistent diagnostics: {LAUNCHER_LOG}', width=1,
+        log_header, text=f'Diagnostics: {LAUNCHER_LOG}', width=1, style='Muted.TLabel',
     )
     diagnostics_label.grid(
         row=0,
@@ -64,6 +64,7 @@ def _build_log_and_overlay(self, main_frame):
         height=6,
         wrap='word',
         state='disabled',
+        font=('Cascadia Mono', 9),
         background='black',
         foreground='white',
     )
@@ -82,7 +83,7 @@ def _build_log_and_overlay(self, main_frame):
         self.busy_overlay,
         background='#f9fcff',
         highlightbackground='#79cfff',
-        highlightthickness=3,
+        highlightthickness=1,
         padx=34,
         pady=26,
     )
@@ -92,7 +93,7 @@ def _build_log_and_overlay(self, main_frame):
         text='',
         background='#f9fcff',
         foreground='#172a3a',
-        font=('Segoe UI', 13, 'bold'),
+        font=('Segoe UI', 16, 'bold'),
     )
     self.busy_title.pack()
     self.busy_detail = tk.Label(
@@ -100,7 +101,7 @@ def _build_log_and_overlay(self, main_frame):
         text='',
         background='#f9fcff',
         foreground='#4c6172',
-        font=('Segoe UI', 9),
+        font=('Segoe UI', 10),
         wraplength=380,
         justify='center',
     )

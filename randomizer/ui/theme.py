@@ -1,5 +1,109 @@
 """Tk theme application for the launcher window."""
 
+import tkinter as tk
+from tkinter import font as tkfont
+
+
+def _apply_checkbox_indicators(self, palette, accent, accent_text):
+    """A clear tick and a distinct partial-selection bar at the current DPI."""
+    size = max(16, round(16 * self.winfo_fpixels('1i') / 96))
+    key = (self.dark_mode_var.get(), size, accent, palette['field'], palette['border'])
+    cache = getattr(self, '_modern_checkbox_images', {})
+    if key not in cache:
+        def picture(mark=None, disabled=False):
+            # Transparent space belongs to the indicator so every label keeps
+            # a readable gap, including colored matrix headers and counts.
+            photo = tk.PhotoImage(master=self, width=size + max(5, round(size * .35)), height=size)
+            scale = size / 16
+            border = palette['muted'] if not disabled else palette['border']
+            fill = (palette['panel'] if disabled else accent) if mark else palette['field']
+            ink = palette['muted'] if disabled else accent_text
+            photo.put(border, to=(0, 0, size, size))
+            edge = max(1, round(scale))
+            photo.put(fill, to=(edge, edge, size-edge, size-edge))
+            if mark == 'partial':
+                photo.put(ink, to=(round(4*scale), round(7*scale),
+                                   round(12*scale), round(9*scale)))
+            elif mark == 'tick':
+                for x, y in ((3, 8), (4, 9), (5, 10), (6, 11),
+                             (7, 10), (8, 9), (9, 8), (10, 7), (11, 6), (12, 5)):
+                    photo.put(ink, to=(round(x*scale), round(y*scale),
+                                      min(size, round((x+2)*scale)),
+                                      min(size, round((y+2)*scale))))
+            return photo
+
+        images = [picture(), picture('tick'), picture('partial'),
+                  picture(disabled=True), picture('tick', True), picture('partial', True)]
+        element = f'Modern{len(cache)}.Checkbutton.indicator'
+        self.style.element_create(
+            element, 'image', images[0],
+            ('disabled', 'alternate', images[5]), ('disabled', 'selected', images[4]),
+            ('disabled', images[3]), ('alternate', images[2]), ('selected', images[1]),
+            sticky='',
+        )
+        cache[key] = (element, images)
+        self._modern_checkbox_images = cache
+    self.style.layout('TCheckbutton', [
+        ('Checkbutton.padding', {'sticky': 'nswe', 'children': [
+            (cache[key][0], {'side': 'left', 'sticky': ''}),
+            ('Checkbutton.focus', {'side': 'left', 'sticky': 'w', 'children': [
+                ('Checkbutton.label', {'sticky': 'nswe'}),
+            ]}),
+        ]}),
+    ])
+
+
+def _apply_type_and_native_surfaces(self, palette):
+    """Make menus, text surfaces and future dialogs match the ttk theme."""
+    if not getattr(self, '_modern_fonts_initialized', False):
+        for name, size, weight in (
+            ('TkDefaultFont', 10, 'normal'), ('TkTextFont', 10, 'normal'),
+            ('TkMenuFont', 10, 'normal'), ('TkHeadingFont', 10, 'bold'),
+            ('TkCaptionFont', 10, 'bold'), ('TkSmallCaptionFont', 9, 'normal'),
+            ('TkTooltipFont', 9, 'normal'),
+        ):
+            try:
+                tkfont.nametofont(name, root=self).configure(
+                    family='Segoe UI', size=size, weight=weight)
+            except tk.TclError:
+                pass
+        self._modern_fonts_initialized = True
+    self.option_add('*Toplevel.background', palette['background'])
+    self.option_add('*Menu.background', palette['panel'])
+    self.option_add('*Menu.foreground', palette['foreground'])
+    self.option_add('*Menu.activeBackground', palette['select'])
+    self.option_add('*Menu.activeForeground', palette['select_foreground'])
+    self.option_add('*Menu.relief', 'flat')
+    self.option_add('*Menu.borderWidth', 1)
+    self.option_add('*Text.font', 'TkTextFont')
+    self.option_add('*Text.highlightThickness', 0)
+    self.option_add('*Text.borderWidth', 0)
+
+    def visit(widget):
+        # Faction tiles intentionally keep their native colors and animation.
+        if isinstance(widget, (tk.Text, tk.Listbox)):
+            widget.configure(
+                background=palette['field'], foreground=palette['foreground'],
+                selectbackground=palette['select'],
+                selectforeground=palette['select_foreground'],
+                relief='flat', borderwidth=0,
+                highlightthickness=1, highlightbackground=palette['border'],
+                highlightcolor=palette['select'],
+            )
+            if isinstance(widget, tk.Text):
+                widget.configure(insertbackground=palette['foreground'], padx=10, pady=8)
+        elif isinstance(widget, tk.Menu):
+            widget.configure(
+                background=palette['panel'], foreground=palette['foreground'],
+                activebackground=palette['select'],
+                activeforeground=palette['select_foreground'],
+                relief='flat', borderwidth=1,
+            )
+        for child in widget.winfo_children():
+            visit(child)
+
+    visit(self)
+
 
 def apply_color_mode(self):
     """Apply the current launcher palette to all constructed widgets."""
@@ -19,10 +123,26 @@ def apply_color_mode(self):
     selected = palette['select']
     selected_foreground = palette['select_foreground']
     self.configure(background=background)
+    _apply_type_and_native_surfaces(self, palette)
+
+    accent = '#4ed1c0' if self.dark_mode_var.get() else '#127b71'
+    accent_text = '#092622' if self.dark_mode_var.get() else '#ffffff'
+    accent_hover = '#79e1d4' if self.dark_mode_var.get() else '#0d665e'
+    style.configure('.', font='TkDefaultFont', bordercolor=border,
+                    lightcolor=border, darkcolor=border, focuscolor=selected)
 
     style.configure('TFrame', background=background)
     style.configure('TLabel', background=background, foreground=foreground)
     style.configure('Muted.TLabel', background=background, foreground=palette['muted'])
+    style.configure('Section.TLabel', background=background, foreground=foreground,
+                    font=('Segoe UI', 12, 'bold'))
+    style.configure('Eyebrow.TLabel', background=background, foreground=palette['muted'],
+                    font=('Segoe UI', 8, 'bold'))
+    style.configure('Pool.Summary.TLabel', background=background, foreground=accent,
+                    font=('Segoe UI', 10, 'bold'))
+    style.configure('Tooltip.TLabel', background=panel, foreground=foreground,
+                    bordercolor=border, borderwidth=1, padding=(12, 9),
+                    font=('Segoe UI', 9))
     shop_colors = {
         'Stage': '#79c0ff' if self.dark_mode_var.get() else '#0969da',
         'Status': '#7ee787' if self.dark_mode_var.get() else '#1a7f37',
@@ -71,13 +191,40 @@ def apply_color_mode(self):
     )
     # ttk's canonical style name uses a lowercase "f". The old spelling
     # configured an unused style and left Settings group interiors light.
-    style.configure('TLabelframe', background=background, bordercolor=border)
-    style.configure('TLabelframe.Label', background=background, foreground=foreground)
-    style.configure('TCheckbutton', background=background, foreground=foreground)
+    style.configure('TLabelframe', background=background, bordercolor=border,
+                    borderwidth=1, relief='solid')
+    style.configure('TLabelframe.Label', background=background, foreground=foreground,
+                    font=('Segoe UI', 11, 'bold'))
+    style.configure('TCheckbutton', background=background, foreground=foreground,
+                    padding=(0, 3), focusthickness=1)
     self.ensure_checkbutton_indicator()
-    style.configure('TRadiobutton', background=background, foreground=foreground)
-    style.configure('TButton', background=panel, foreground=foreground, bordercolor=border)
-    style.configure('Launch.TButton', background=panel, foreground=foreground, bordercolor=border)
+    _apply_checkbox_indicators(self, palette, accent, accent_text)
+    style.configure('TRadiobutton', background=background, foreground=foreground, padding=(0, 3))
+    style.configure('TButton', background=panel, foreground=foreground, bordercolor=border,
+                    borderwidth=1, relief='flat', padding=(12, 7), focusthickness=1)
+    style.configure('Compact.TButton', padding=(8, 5), font=('Segoe UI', 9))
+    style.configure('TMenubutton', background=panel, foreground=foreground,
+                    bordercolor=border, borderwidth=1, relief='flat',
+                    padding=(10, 7), arrowcolor=foreground)
+    style.map('TMenubutton', background=[('active', selected)],
+              foreground=[('disabled', palette['muted']), ('active', selected_foreground)])
+    for name in ('Primary.TButton', 'Launch.TButton', 'Shop.StartNewRun.TButton'):
+        style.configure(name, background=accent, foreground=accent_text,
+                        bordercolor=accent, padding=(16, 9), font=('Segoe UI', 10, 'bold'))
+        style.map(name, background=[('disabled', panel), ('pressed', accent_hover),
+                                    ('active', accent_hover)],
+                  foreground=[('disabled', palette['muted']), ('!disabled', accent_text)],
+                  bordercolor=[('focus', foreground), ('!focus', accent)])
+    for faction, color in {
+        'Allies': '#78b6f7', 'Soviets': '#ff9298', 'Epsilon': '#c7a0f7',
+        'Foehn': '#59d2c6', 'Mixed': '#f1cc7c',
+    }.items():
+        if not self.dark_mode_var.get():
+            color = {'Allies': '#285f9e', 'Soviets': '#a53636', 'Epsilon': '#70429a',
+                     'Foehn': '#087b75', 'Mixed': '#806018'}[faction]
+        style.configure(f'Pool.{faction}.TCheckbutton', foreground=color)
+        style.map(f'Pool.{faction}.TCheckbutton',
+                  foreground=[('disabled', palette['muted']), ('!disabled', color)])
     style.configure(
         'Danger.TButton',
         background='#5c2327' if self.dark_mode_var.get() else '#ffebe9',
@@ -92,19 +239,13 @@ def apply_color_mode(self):
         ],
         foreground=[('disabled', palette['muted'])],
     )
-    style.configure(
-        'Shop.StartNewRun.TButton',
-        background=selected,
-        foreground=selected_foreground,
-        bordercolor=border,
-    )
     style.map(
         'TButton',
         background=[
             ('disabled', panel), ('active', selected), ('pressed', selected),
         ],
         foreground=[
-            ('disabled', foreground),
+            ('disabled', palette['muted']),
             ('active', selected_foreground),
             ('pressed', selected_foreground),
         ],
@@ -112,15 +253,17 @@ def apply_color_mode(self):
     style.map(
         'TCheckbutton',
         background=[('disabled', background), ('active', background)],
-        foreground=[('disabled', foreground), ('active', foreground)],
+        foreground=[('disabled', palette['muted']), ('active', foreground)],
     )
     style.map(
         'TRadiobutton',
         background=[('disabled', background), ('active', background)],
-        foreground=[('disabled', foreground), ('active', foreground)],
+        foreground=[('disabled', palette['muted']), ('active', foreground)],
     )
-    style.configure('TEntry', fieldbackground=field, foreground=foreground, insertcolor=foreground)
-    style.configure('TSpinbox', fieldbackground=field, foreground=foreground, arrowcolor=foreground)
+    style.configure('TEntry', fieldbackground=field, foreground=foreground, insertcolor=foreground,
+                    borderwidth=1, padding=(8, 6))
+    style.configure('TSpinbox', fieldbackground=field, foreground=foreground, arrowcolor=foreground,
+                    borderwidth=1, padding=(8, 6), arrowsize=12)
     style.map(
         'TEntry',
         fieldbackground=[('disabled', field)],
@@ -139,6 +282,9 @@ def apply_color_mode(self):
         background=panel,
         foreground=foreground,
         arrowcolor=foreground,
+        padding=(8, 6),
+        arrowsize=12,
+        borderwidth=1,
     )
     # ttk combobox popdowns are Tk Listboxes, not ttk widgets. Keep their
     # palette aligned with the themed field instead of using native light
@@ -178,7 +324,7 @@ def apply_color_mode(self):
         selectbackground=[('readonly', selected)],
         selectforeground=[('readonly', selected_foreground)],
     )
-    style.configure('TNotebook', background=background, bordercolor=border)
+    style.configure('TNotebook', background=background, bordercolor=border, borderwidth=1)
     style.configure(
         'TNotebook.Tab',
         background=panel,
@@ -199,12 +345,12 @@ def apply_color_mode(self):
         ],
         padding=[('selected', (8, 6)), ('active', (8, 6))],
     )
-    style.configure('Randomizer.TNotebook', background=background, bordercolor=border, tabposition='n')
+    style.configure('Randomizer.TNotebook', background=background, bordercolor=border, tabposition='nw')
     style.configure(
         'Randomizer.TNotebook.Tab',
         background=panel,
         foreground=foreground,
-        padding=(16, 7),
+        padding=(16, 10),
         font=('Segoe UI', 10, 'bold'),
     )
     style.map(
@@ -219,7 +365,7 @@ def apply_color_mode(self):
             ('active', foreground),
             ('disabled', palette['muted']),
         ],
-        padding=[('selected', (16, 7)), ('active', (16, 7))],
+        padding=[('selected', (16, 10)), ('active', (16, 10))],
     )
     style.configure('Info.TNotebook', background=background, bordercolor=border, tabposition='nw')
     style.configure(
@@ -271,6 +417,9 @@ def apply_color_mode(self):
         fieldbackground=field,
         foreground=foreground,
         bordercolor=border,
+        borderwidth=0,
+        rowheight=30,
+        font=('Segoe UI', 10),
     )
     style.configure('StartingUnlocks.Treeview', rowheight=52)
     style.configure('ShopCameo.Treeview', rowheight=52)
@@ -279,7 +428,9 @@ def apply_color_mode(self):
         background=[('selected', selected)],
         foreground=[('selected', selected_foreground)],
     )
-    style.configure('Treeview.Heading', background=panel, foreground=foreground, bordercolor=border)
+    style.configure('Treeview.Heading', background=panel, foreground=palette['muted'],
+                    bordercolor=border, relief='flat', padding=(8, 9),
+                    font=('Segoe UI', 9, 'bold'))
     style.map('Treeview.Heading', background=[('active', palette['canvas'])])
     if hasattr(self, 'configure_shop_tree_tags'):
         self.configure_shop_tree_tags()
@@ -289,7 +440,13 @@ def apply_color_mode(self):
         troughcolor=background,
         bordercolor=border,
         arrowcolor=foreground,
+        arrowsize=12,
+        borderwidth=0,
+        relief='flat',
     )
+    style.configure('TSeparator', background=border)
+    style.configure('TProgressbar', background=accent, troughcolor=field,
+                    bordercolor=field, lightcolor=accent, darkcolor=accent)
 
     if hasattr(self, 'missions_tree'):
         self.missions_tree.tag_configure(

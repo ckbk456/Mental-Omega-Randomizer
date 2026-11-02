@@ -8,6 +8,7 @@ from randomizer.rewards.arsenal import ARSENAL_MODE
 from randomizer.rewards.catalogue import MAX_REWARDS_PER_CHECK
 from randomizer.ui.config import CAMPAIGN_FILTERS, PROGRESSION_MODES, REWARD_MODES
 from randomizer.missions.pool import select_mission_pool
+from randomizer.missions.unified import validate_mixed_generation
 from .reward_controller import RewardGeneration
 from .seed_controller import SeedGeneration
 from .starting_unlocks import StartingUnlocks
@@ -28,7 +29,7 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
         if 'mission_category' not in settings:
             self.config['mission_category'] = 'coop' if settings.get('coop_mode') else 'campaign'
         category = self.config['mission_category']
-        if category not in {'campaign', 'coop', 'challenge'}:
+        if category not in {'campaign', 'coop', 'challenge', 'mixed'}:
             raise ValueError('launcher_settings.mission_category is invalid.')
         if category == 'challenge':
             count = self.config.get('challenge_player_count', 1)
@@ -39,6 +40,10 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
             raise ValueError('launcher_settings.coop_mode must be a boolean.')
         if category != 'challenge':
             self.config['coop_mode'] = category == 'coop'
+        if category == 'mixed':
+            # Pool factions identify authored content, not reward restrictions.
+            # Never carry a hidden legacy campaign filter into a mixed run.
+            self.config['campaign_filter'] = 'All Campaigns'
         self.state = {}
         self.missions = deepcopy(missions)
         self._mission_by_code = {mission['code']: mission for mission in self.missions}
@@ -52,6 +57,8 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
         mode = config['progression_mode']
         campaign = config['campaign_filter']
         reward_mode = generation['reward_mode']
+        selection = (validate_mixed_generation(config.get('mission_pool_selection'), mode)
+                     if config['mission_category'] == 'mixed' else None)
         if config['mission_category'] == 'challenge' and mode == 'Shop Mode':
             raise ValueError('Challenges currently support Classic, Grid Mode and Mission List.')
         for name, value, choices in (
@@ -74,10 +81,14 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
                          else 'excluded_coop_mission_codes' if config.get('coop_mode')
                          else 'excluded_mission_codes')
         excluded = {str(code).upper() for code in generation.get(exclusion_key, ())}
+        if selection is not None:
+            excluded.update(str(code).upper() for code in generation.get('excluded_coop_mission_codes', ()))
+            excluded.update(str(code).upper() for code in generation.get('excluded_mission_codes', ()))
         missions = select_mission_pool(
             self.missions, category=config['mission_category'], campaign=campaign,
             include_challenges=include_challenges, excluded_codes=excluded,
             excluded_challenge_codes=generation.get('excluded_challenge_mission_codes', ()),
+            selection=selection,
         )
         missions = filter_missions_by_build_settings(
             missions,
@@ -163,6 +174,7 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
             'progression_mode': mode,
             'two_start_positions': config['grid_two_start_positions'],
             'mission_pool_settings': mission_settings,
+            'mission_pool_selection': selection,
         }
         state = self.build_seed_generation(options)['state']
         state.pop('created_at', None)

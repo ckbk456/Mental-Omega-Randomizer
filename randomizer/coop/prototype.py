@@ -451,6 +451,8 @@ def build_manifest(game_root: Path, state: dict, coop_name: str, *,
                    guest_country: str = '', player_colors=None,
                    ai_teammate: dict | None = None) -> tuple[dict, bytes]:
     _validate_difficulty(difficulty)
+    if type(game_speed) is not int or game_speed not in range(7):
+        raise ValueError('Game speed must be between 0 and 6.')
     if state.get('progression_mode') not in SUPPORTED_PROGRESSION:
         raise ValueError('Prototype supports Classic, Grid Mode, and Mission List; Shop Mode is excluded.')
     if not state.get('seed'):
@@ -564,6 +566,7 @@ def build_manifest(game_root: Path, state: dict, coop_name: str, *,
         'starting_credit_bonus': credit_bonus,
         'test_override': test_override,
         'reward_name': reward.get('name', selected_id),
+        'game_speed': game_speed,
         'production_type': production_type,
         'player_country': country,
         'map_key': map_key,
@@ -674,6 +677,8 @@ def rebuild_from_manifest(game_root: Path, manifest: dict) -> bytes:
         raise ValueError('Legacy co-op manifest cannot select challenge settings.')
     elif 'ai_teammate' in manifest:
         raise ValueError('Legacy co-op manifests cannot select an AI teammate.')
+    if type(manifest.get('game_speed', 2)) is not int or manifest.get('game_speed', 2) not in range(7):
+        raise ValueError('Co-op manifest has an invalid host game speed.')
     source_key = str(manifest.get('source_key', ''))
     coop_name = source_key.rsplit('\\', 1)[-1]
     source, actual_key, _metadata, country, family = (

@@ -2,7 +2,8 @@
 
 from randomizer.config.tuning import mission_assistance_stack_count
 from randomizer.coop import feature
-from randomizer.core.paths import BACKUP_DIR, state_path_for_mode
+from randomizer.core.paths import APP_DIR, BACKUP_DIR, state_path_for_mode
+from randomizer.core.run_library import RunLibrary
 from .archipelago_state import normalize_archipelago_activation
 
 from ._dependencies import (
@@ -89,7 +90,9 @@ class StateController(GenerationSettings):
 
         previous = self.state
         try:
-            result = migrate_legacy_challenge_run(self.state, self.missions, self.config)
+            from randomizer.missions.pool import is_challenge
+            result = migrate_legacy_challenge_run(
+                self.state, [mission for mission in self.missions if is_challenge(mission)], self.config)
             if result is None:
                 return
             upgraded, added = result
@@ -116,10 +119,19 @@ class StateController(GenerationSettings):
             'coop' if self.config.get('coop_mode') else 'campaign'
         )
         path = state_path_for_mode(category, self.config.get('coop_mode', False))
-        if not path.exists():
-            return {}
         try:
-            loaded = read_json_object(path)
+            library = RunLibrary(APP_DIR)
+            for error in library.import_legacy(path.name):
+                log_event('legacy_run_import_failed', error=error)
+            run_id = library.index().get('active_run_id')
+            if run_id:
+                loaded = library.load(run_id)
+                self.config['active_run_id'] = run_id
+                path = library.path(run_id)
+            elif path.exists():
+                loaded = read_json_object(path)
+            else:
+                return {}
             restore = getattr(
                 self, 'restore_archipelago_context_on_startup', None
             )
@@ -311,7 +323,7 @@ class StateController(GenerationSettings):
         completed = self.state['completed_missions']
         if self.state.get('progression_mode') == 'Grid Mode' and isinstance(self.state.get('grid'), dict):
             existing_grid = self.state['grid']
-            if existing_grid.get('layout_version') != 3:
+            if existing_grid.get('layout_version') not in {3, 4}:
                 try:
                     self.state['grid'] = create_grid(
                         self.state.get('mission_order', []),
@@ -370,11 +382,9 @@ class StateController(GenerationSettings):
         self.__dict__.pop('_unlock_dashboard_sources_cache', None)
         self.__dict__.pop('_configured_reward_pool_cache', None)
         self._enemy_buffs_view_dirty = True
-        category = self.state.get('mission_category') or (
-            'coop' if self.state.get('coop_mode') else 'campaign'
-        )
-        path = state_path_for_mode(category, self.state.get('coop_mode', False))
-        atomic_write_json(path, self.state, indent=None)
+        RunLibrary(APP_DIR).save(self.state)
+        if self.state.get('run_id'):
+            self.config['active_run_id'] = self.state['run_id']
         self.coop_publish_state()
 
 
@@ -639,7 +649,11 @@ class StateController(GenerationSettings):
         return bool(self.config.get('use_act_based_reward_multipliers', True))
 
     def save_launcher_config(self, seed, mission_goal, rewards_per_check):
+        if self.coop_guest_connected():
+            return
         self.config['mission_category'] = self.selected_mission_category()
+        if hasattr(self, 'mission_pool_selection'):
+            self.config['mission_pool_selection'] = self.mission_pool_selection
         self.config['challenge_player_count'] = self.selected_challenge_player_count()
         self.config['challenge_country'] = self.challenge_country_var.get()
         self.store_challenge_local_options()
@@ -757,6 +771,8 @@ class StateController(GenerationSettings):
         save_config(self.config)
 
     def save_current_launcher_config(self):
+        if self.coop_guest_connected():
+            return
         self.save_launcher_config(
             self.seed_var.get(),
             self.selected_mission_goal(),
@@ -858,6 +874,8 @@ class StateController(GenerationSettings):
             'coop' if config.get('coop_mode') else 'campaign'
         )
         self.mission_category_var.set(category)
+        self.initialize_mission_pool_selection()
+        self.refresh_unified_pool()
         self.challenge_player_count_var.set(str(config.get('challenge_player_count', 1)))
         self.challenge_country_var.set(str(config.get('challenge_country') or 'UnitedStates'))
         self.restore_challenge_local_options_from_config()

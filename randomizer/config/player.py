@@ -61,7 +61,7 @@ def migrate_loaded_config(loaded):
     if not isinstance(loaded, dict):
         return False
     changed = False
-    if loaded.get('mission_category') not in {'campaign', 'coop', 'challenge'}:
+    if loaded.get('mission_category') not in {'campaign', 'coop', 'challenge', 'mixed'}:
         loaded['mission_category'] = 'coop' if loaded.get('coop_mode') else 'campaign'
         changed = True
     count = loaded.get('challenge_player_count', 1)

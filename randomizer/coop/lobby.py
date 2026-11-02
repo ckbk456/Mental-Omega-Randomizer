@@ -20,7 +20,7 @@ from randomizer.coop.runtime import installation_details, validate_runtime
 
 
 LOBBY_PORT = 19420
-PROTOCOL = 4
+PROTOCOL = 5
 MAX_WIRE = 8 * 1024 * 1024
 MAX_STATE = 32 * 1024 * 1024
 
@@ -39,7 +39,8 @@ def decode_state(encoded: str) -> dict:
     if len(raw) > MAX_STATE or decompressor.unconsumed_tail or not decompressor.eof:
         raise ValueError('Shared run state is invalid or too large.')
     state = json.loads(raw)
-    if not isinstance(state, dict) or not state.get('coop_mode'):
+    if not isinstance(state, dict) or not (
+            state.get('coop_mode') or state.get('mission_category') == 'mixed'):
         raise ValueError('Host did not send a co-op run.')
     return state
 
@@ -179,7 +180,7 @@ class Lobby:
                 else (peer_nonce, local_nonce)
             )
             def proof(role):
-                payload = f'coop-lobby-v4:{role}:{host_nonce}:{guest_nonce}'.encode('ascii')
+                payload = f'coop-lobby-v5:{role}:{host_nonce}:{guest_nonce}'.encode('ascii')
                 return hmac.new(self.pairing_code.encode('utf-8'), payload,
                                 hashlib.sha256).hexdigest()
             self._send_raw({'type': 'proof', 'value': proof(self.role)})
@@ -202,6 +203,7 @@ class Lobby:
                 message = self._receive(stream)
                 if message.get('type') not in {
                     'state', 'select', 'suggest', 'launch', 'player_options', 'challenge_victory',
+                    'party_status', 'prepare_request', 'prepare_ready',
                     'shop_stage', 'shop_ready', 'shop_victory', 'shop_failure',
                     'fortress_roster', 'fortress_prepare', 'fortress_ready',
                     'fortress_start', 'fortress_abort',

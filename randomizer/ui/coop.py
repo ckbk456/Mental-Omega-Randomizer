@@ -4,17 +4,26 @@ import tkinter as tk
 from tkinter import ttk
 
 from randomizer.challenges.catalogue import COUNTRY_LABELS
+from randomizer.ui.config import GAME_SPEEDS
 from randomizer.ui.tooltips import WidgetTooltip
 
 
 def build_coop_controls(self, parent, row, *, shop=False):
     """Group co-op, optional challenges, player setup, and connection."""
     frame = ttk.LabelFrame(
-        parent, text='Co-op' if shop else 'Co-op & Challenges', padding=8,
+        parent, text='Co-op' if shop else 'Party & mission setup', padding=14,
     )
     frame.columnconfigure(1, weight=1)
     frame.grid(row=row, column=0, columnspan=2 if shop else 1,
                sticky='ew', pady=(8, 8))
+    if not hasattr(self, 'party_launch_summary_var'):
+        self.party_launch_summary_var = tk.StringVar(master=self, value=(
+            'Select a mission to see its player setup. Friends can join between missions.'))
+    party_summary = ttk.Label(
+        frame, textvariable=self.party_launch_summary_var, style='Muted.TLabel',
+        wraplength=360, justify='left',
+    )
+    party_summary.grid(row=7, column=0, columnspan=3, sticky='ew', pady=(12, 0))
     toggle = ttk.Checkbutton(
         frame, text='Co-op', variable=self.coop_mode_var,
         command=self.on_coop_checkbox_changed,
@@ -32,8 +41,6 @@ def build_coop_controls(self, parent, row, *, shop=False):
         'Adds installed challenges to the next seed. Mission goal and Advanced exclusions apply. '
         'Available in standalone Grid Mode, Mission List and Classic.',
     )
-    if not shop:
-        self.build_skirmish_pool_control(frame, row=2)
     player_label = ttk.Label(frame, text='Human players (legacy run)')
     player_label.grid(row=3, column=0, sticky='w', pady=(5, 0))
     count = ttk.Combobox(
@@ -51,8 +58,24 @@ def build_coop_controls(self, parent, row, *, shop=False):
     fortress_count.grid(row=3, column=1, sticky='w', padx=(8, 0), pady=(5, 0))
     fortress_label.grid_remove()
     fortress_count.grid_remove()
-    local = ttk.LabelFrame(frame, text='Local challenge players', padding=8)
-    local.grid(row=4, column=0, columnspan=3, sticky='ew', pady=(8, 0))
+    if not hasattr(self, 'challenge_partner_var'):
+        self.challenge_partner_var = tk.StringVar(
+            master=self, value=self.config.get('challenge_partner', 'AI teammate'))
+    partner_row = ttk.Frame(frame)
+    partner_row.columnconfigure(1, weight=1)
+    partner_row.grid(row=8, column=0, columnspan=3, sticky='ew', pady=(10, 0))
+    ttk.Label(partner_row, text='Challenge partner').grid(row=0, column=0, padx=(0, 10))
+    partner = ttk.Combobox(
+        partner_row, textvariable=self.challenge_partner_var,
+        values=('Solo', 'AI teammate', 'Friend'), state='readonly', width=16,
+    )
+    partner.grid(row=0, column=1, sticky='ew')
+    partner.bind('<<ComboboxSelected>>', self.on_challenge_partner_changed)
+    partner.bind('<MouseWheel>', self.on_settings_control_mousewheel)
+    if shop or self.selected_mission_category() != 'mixed':
+        partner_row.grid_remove()
+    local = ttk.LabelFrame(frame, text='Challenge players', padding=12)
+    local.grid(row=9, column=0, columnspan=3, sticky='ew', pady=(12, 0))
     local.columnconfigure(1, weight=1)
     country_label = ttk.Label(local, text='Your house')
     country_label.grid(row=0, column=0, sticky='w', padx=(0, 8), pady=2)
@@ -104,7 +127,7 @@ def build_coop_controls(self, parent, row, *, shop=False):
               justify='left', style='Muted.TLabel').grid(
                   row=6, column=0, columnspan=2, sticky='w', pady=(5, 0))
     connect = ttk.Button(
-        frame, text='Co-op Connection…', command=self.open_coop_dialog,
+        frame, text='Invite or join friend…', command=self.open_coop_dialog,
     )
     connect.grid(row=5, column=0, columnspan=3, sticky='w', pady=(5, 0))
     if not hasattr(self, 'challenge_availability_var'):
@@ -115,6 +138,23 @@ def build_coop_controls(self, parent, row, *, shop=False):
     )
     availability.grid(row=6, column=0, columnspan=3, sticky='w')
     prefix = 'shop_' if shop else ''
+    speed_row = ttk.Frame(frame)
+    speed_row.columnconfigure(1, weight=1)
+    speed_row.grid(row=10, column=0, columnspan=3, sticky='ew', pady=(12, 0))
+    ttk.Label(speed_row, text='Game speed').grid(row=0, column=0, sticky='w', padx=(0, 10))
+    speed = ttk.Combobox(
+        speed_row, textvariable=self.game_speed_var, values=tuple(label for label, _ in GAME_SPEEDS),
+        state='readonly', width=16,
+    )
+    speed.grid(row=0, column=1, sticky='ew')
+    speed.bind('<<ComboboxSelected>>', self.on_game_speed_changed)
+    speed.bind('<MouseWheel>', self.on_settings_control_mousewheel)
+    ttk.Label(speed_row, text='Host controls speed for everyone.', style='Muted.TLabel').grid(
+        row=1, column=0, columnspan=2, sticky='w', pady=(4, 0))
+    setattr(self, prefix + 'game_speed_combo', speed)
+    setattr(self, prefix + 'challenge_partner_row', partner_row)
+    setattr(self, prefix + 'challenge_partner_combo', partner)
+    setattr(self, prefix + 'party_launch_summary_label', party_summary)
     setattr(self, prefix + 'fortress_player_count_fields', (fortress_label, fortress_count))
     setattr(self, prefix + 'fortress_player_count_combo', fortress_count)
     setattr(self, prefix + 'coop_mode_tooltip', toggle_tooltip)

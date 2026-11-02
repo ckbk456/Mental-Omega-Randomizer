@@ -51,14 +51,10 @@ class SeedController(SeedGeneration):
         if self.coop_guest_connected():
             messagebox.showinfo('Co-op', 'Only host can generate a shared seed.')
             return
-        if self.state and self.state.get('completed_missions'):
-            confirmed = messagebox.askyesno(
-                'Start New Seed',
-                'This will replace the current randomizer progress. Start a new seed?',
-            )
-            if not confirmed:
-                return
-
+        process = getattr(self, 'active_game_process', None)
+        if (getattr(self, '_coop_busy', False) or getattr(self, 'busy_depth', 0)
+                or (process is not None and process.poll() is None)):
+            return
         self.generate_seed_from_settings()
 
     def generate_seed_from_settings(self):
@@ -82,6 +78,11 @@ class SeedController(SeedGeneration):
         if self.gameplay_settings_locked():
             return None
         category = self.selected_mission_category()
+        if self.progression_mode_var.get() in {'Grid Mode', 'Mission List'}:
+            category = 'mixed'
+        if category == 'mixed' and self.progression_mode_var.get() not in {'Grid Mode', 'Mission List'}:
+            messagebox.showinfo('Mission pool', 'The unified mission pool supports Grid Mode and Mission List. Legacy Classic, Shop and Final Fortress keep their own setup.')
+            return None
         if category == 'challenge' and self.progression_mode_var.get() == 'Shop Mode':
             self.append_log('Challenges support Classic, Grid Mode and Mission List.', error=True)
             return None
@@ -203,7 +204,8 @@ class SeedController(SeedGeneration):
 
         generation_context = {
             'mission_category': category,
-            'campaign_filter': self.campaign_var.get(),
+            'mission_pool_selection': (self.mission_pool_selection if category == 'mixed' else None),
+            'campaign_filter': 'All Campaigns' if category == 'mixed' else self.campaign_var.get(),
             'reward_mode': self.reward_mode_var.get(),
             'restrict_final_mission_rewards': bool(self.restrict_final_mission_rewards_var.get()),
             'use_act_based_reward_multipliers': (
@@ -235,7 +237,7 @@ class SeedController(SeedGeneration):
             'starting_defense_ids': starting_defense_ids,
             'starting_unit_ids': starting_unit_ids,
             'progression_mode': self.progression_mode_var.get(),
-            'coop_mode': bool(self.coop_mode_var.get()),
+            'coop_mode': category != 'mixed' and bool(self.coop_mode_var.get()),
             'mission_category': category,
             'challenge_player_count': int(self.challenge_player_count_var.get()),
             'two_start_positions': bool(self.grid_two_starts_var.get()),
@@ -264,7 +266,12 @@ class SeedController(SeedGeneration):
         self._seed_generation_context = None
 
     def finish_seed_generation(self, result):
+        if self.state:
+            self.save_state()
         self.state = result['state']
+        self.mission_category_var.set(self.state.get('mission_category', 'campaign'))
+        self.coop_mode_var.set(bool(self.state.get('coop_mode', False)))
+        self.campaign_var.set(self.state.get('campaign_filter', 'All Campaigns'))
         self.clear_seed_generation_overrides()
         seed = result['seed']
         mission_goal = result['mission_goal']
@@ -290,6 +297,8 @@ class SeedController(SeedGeneration):
         self.reset_archipelago_after_new_seed()
         self.save_state()
         self.save_launcher_config(seed, mission_goal, rewards_per_check)
+        self.refresh_coop_controls()
+        self.refresh_unified_pool()
         self.disable_generated_rules_for_client()
         self.redraw_mission_tree()
         self.update_header_summary()

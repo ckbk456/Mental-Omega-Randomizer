@@ -131,8 +131,8 @@ class WidgetTooltip:
             self.tip,
             text=self.text,
             justify='left',
-            font=('Segoe UI', 10),
-            padding=(8, 6, 8, 6),
+            style='Tooltip.TLabel',
+            padding=(12, 9),
             relief='solid',
             wraplength=380,
         )
@@ -206,7 +206,8 @@ class TreeTooltip:
                     self.tip,
                     text=text,
                     justify='left',
-                    padding=(8, 6, 8, 6),
+                    style='Tooltip.TLabel',
+                    padding=(12, 9),
                     relief='solid',
                     wraplength=620,
                 )

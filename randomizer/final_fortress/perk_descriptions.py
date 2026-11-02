@@ -9,7 +9,7 @@ from .perks import ranks
 
 
 def rank_descriptions(perk, country):
-    _, rules = installed_rules_registry()
+    _, rules = installed_rules_registry(synchronous=True)
 
     def name(kind, count=1):
         power_names = {'ChronoSphereSpecial': 'Chronosphere', 'IronCurtainSpecial': 'Iron Curtain',

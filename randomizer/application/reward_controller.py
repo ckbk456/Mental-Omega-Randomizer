@@ -411,22 +411,19 @@ class RewardController(RewardGeneration):
 
     def load_missions(self, *, category=None, country=None, player_count=None):
         """Read a catalogue; background callers provide frozen mode settings."""
-        category = category or self.selected_mission_category()
-        if category == 'challenge':
-            return discover_challenge_missions(
-                GAME_ROOT,
-                player_count=player_count or self.selected_challenge_player_count(),
-                on_warning=self.append_log,
-            )
-        missions = (discover_coop_missions(GAME_ROOT) if category == 'coop'
-                    else parse_missions(BATTLE_CLIENT_INI, FALLBACK_OBJECTIVE_COUNT))
-        return missions + discover_challenge_missions(GAME_ROOT, on_warning=self.append_log)
+        # Catalogue availability is independent of the current run and party.
+        # Legacy/new-run selectors filter this union without hiding installed maps.
+        missions = parse_missions(BATTLE_CLIENT_INI, FALLBACK_OBJECTIVE_COUNT)
+        missions += discover_coop_missions(GAME_ROOT)
+        missions += discover_challenge_missions(GAME_ROOT, on_warning=self.append_log)
+        return list({mission['code']: mission for mission in missions}.values())
 
     def apply_missions(self, missions):
         """Apply a previously parsed mission catalogue to launcher widgets."""
         self.missions = missions
         self._mission_load_error = ''
         self._mission_by_code = {mission['code']: mission for mission in self.missions}
+        self.refresh_unified_pool()
         self.mission_goal_spinbox.configure(to=max(1, len(self.missions)))
         if self.missions and self.mission_goal_var.get() > len(self.missions):
             self.mission_goal_var.set(len(self.missions))

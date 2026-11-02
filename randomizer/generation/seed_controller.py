@@ -4,7 +4,8 @@ from randomizer.rewards.arsenal import ARSENAL_MODE, generate_mission_arsenals
 from randomizer.rewards.enemy_scaling import ENEMY_REWARD_PLAN_VERSION, plan_enemy_check_rewards
 from randomizer.missions.catalogue import LATE_FOEHN_MISSION_CODES, LOW_LEVEL_MISSION_COUNT, NO_BUILD_MISSION_CODES, STARTING_UNLOCKED_MISSIONS, campaign_mission_counts, classic_mission_order, seed_campaign_limits, seed_mission_order
 from randomizer.rewards.catalogue import REWARD_POOL, check_rewards
-from randomizer.progression.grid import create_grid, grid_opening_mission_count
+from randomizer.progression.grid import add_optional_branches, create_grid, grid_opening_mission_count
+from randomizer.missions.unified import mission_kind, validate_mixed_generation
 from randomizer.maps.rules import now_stamp
 import random
 
@@ -31,6 +32,28 @@ class SeedGeneration:
         two_start_positions = options['two_start_positions']
         mission_pool_settings = options['mission_pool_settings']
         campaign_counts = campaign_mission_counts(seed_missions)
+        mixed_selection = None
+        optional_missions = []
+        if options.get('mission_category') == 'mixed':
+            mixed_selection = validate_mixed_generation(
+                options.get('mission_pool_selection'), progression_mode,
+            )
+            if mixed_selection['cooperative_policy'] == 'flexible':
+                optional_missions = [mission for mission in seed_missions
+                                     if mission_kind(mission) == 'coop']
+                seed_missions = [mission for mission in seed_missions
+                                 if mission_kind(mission) != 'coop']
+                if not seed_missions:
+                    raise ValueError(
+                        'Flexible runs need campaign missions or challenges for a solo path. '
+                        'Add those categories, or choose Co-op required.'
+                    )
+                if mission_goal > len(seed_missions):
+                    raise ValueError(
+                        f'Flexible mission goal is {mission_goal}, but only {len(seed_missions)} '
+                        'solo-capable missions are selected. Lower the mission goal or add '
+                        'campaign missions/challenges. Native co-op maps are optional bonuses.'
+                    )
         rng = random.Random(seed)
         if progression_mode == 'Classic':
             mission_codes = classic_mission_order(seed_missions, mission_goal)
@@ -67,6 +90,23 @@ class SeedGeneration:
                 )
             except ValueError as exc:
                 raise ValueError(f'Cannot generate grid: {exc}.') from exc
+        required_mission_codes = list(mission_codes)
+        optional_mission_codes = [mission['code'] for mission in optional_missions]
+        optional_mission_parents = {}
+        if optional_mission_codes:
+            rng.shuffle(optional_mission_codes)
+            optional_mission_parents = {
+                code: required_mission_codes[
+                    index * len(required_mission_codes) // len(optional_mission_codes)
+                ]
+                for index, code in enumerate(optional_mission_codes)
+            }
+            if grid is not None:
+                add_optional_branches(grid, optional_mission_codes, optional_mission_parents)
+            # Keep the core finale last for the existing final-reward restriction.
+            # Unlock order is stored independently, so bonus maps never gate it.
+            mission_codes = (required_mission_codes[:-1] + optional_mission_codes
+                             + required_mission_codes[-1:])
         mission_arsenals = {}
         if options['reward_mode'] == ARSENAL_MODE:
             progress('Building seed-fixed mission arsenals.', 2, 5)
@@ -205,6 +245,14 @@ class SeedGeneration:
             'mission_arsenals': mission_arsenals,
             'check_schema_version': CHECK_SCHEMA_VERSION,
         }
+        if mixed_selection is not None:
+            state.update(
+                mission_pool_selection=mixed_selection,
+                required_mission_order=required_mission_codes,
+                optional_mission_codes=optional_mission_codes,
+                optional_mission_parents=optional_mission_parents,
+                coop_mode=False,
+            )
         if state['mission_category'] == 'challenge':
             # Houses are chosen for each launch; the seed owns only its
             # progression and reward plan, never a player's current house.

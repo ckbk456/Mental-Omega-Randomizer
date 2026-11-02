@@ -60,8 +60,16 @@ class FortressCoopController(FortressCoopLaunchController):
             if include is not None:
                 include.configure(variable=self._fortress_challenge_maps_var if fortress
                                   else self.include_challenge_missions_var)
+            speed = getattr(self, prefix + 'game_speed_combo', None)
+            if speed is not None:
+                speed.master.grid_remove() if fortress else speed.master.grid()
+            summary = getattr(self, prefix + 'party_launch_summary_label', None)
+            if summary is not None:
+                summary.grid_remove() if fortress else summary.grid()
             if not fortress:
                 continue
+            if toggle is not None:
+                toggle.grid()
             if include is not None:
                 include.grid_remove()
             for field in getattr(self, prefix + 'challenge_fields', ()):
@@ -80,7 +88,7 @@ class FortressCoopController(FortressCoopLaunchController):
                 button.grid() if enabled or sessions else button.grid_remove()
         frame = getattr(self, 'coop_controls_frame', None)
         if frame is not None:
-            frame.configure(text='Final Fortress co-op' if fortress else 'Co-op & Challenges')
+            frame.configure(text='Final Fortress co-op' if fortress else 'Party & mission setup')
 
     def open_coop_dialog(self):
         if self.final_fortress_mode_selected():
