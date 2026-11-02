@@ -203,6 +203,12 @@ def parse_missions(path, fallback_objective_count=FALLBACK_OBJECTIVE_COUNT):
     missions = []
     for position, code in enumerate(mission_codes, start=1):
         section = sections.get(code, {})
+        enabled = {
+            key.casefold(): value for key, value in section.items()
+        }.get('enabled', '')
+        # Addon catalogues can list unreleased maps as disabled placeholders.
+        if enabled.casefold() in {'false', 'no', '0'}:
+            continue
         scenario = section.get('Scenario') or section.get('SCENARIO')
         if not scenario:
             continue
