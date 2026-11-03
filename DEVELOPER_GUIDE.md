@@ -1,5 +1,8 @@
 # Developer Guide
 
+Repository workflow: [AGENTS.md](AGENTS.md), [command registry](docs/DEVELOPMENT_WORKFLOW.md),
+and [manual QA index](testing/MANUAL%20TO-DO/README.md).
+
 Start here when changing code. Player settings belong in
 [README_RANDOMIZER.md](README_RANDOMIZER.md); exact engine findings belong in
 [TECHNICAL_FINDINGS.md](TECHNICAL_FINDINGS.md).
@@ -150,7 +153,8 @@ when an older external `ui.json` has no profiles.
   role-specific pairing codes, display privacy and connection log controls.
 - `randomizer/coop/compatibility.py` and `runtime.py`: case-independent native
   file resolution and newline-normalized text fingerprints. Binary and prepared
-  map hashes remain exact. Both peers must use lobby/game protocol 3.
+  map hashes remain exact. Both peers must use the same build: party lobby protocol 6, direct-game protocol 3,
+  and Fortress lobby protocol `fortress-auto-3` in local 1.48.1.
   [COOP_CONNECTION_GUIDE.md](COOP_CONNECTION_GUIDE.md) covers player setup.
 - `randomizer/ui/builder.py`: stable widget-construction facade.
 - `randomizer/ui/layout.py`, `settings.py`, `shop.py`, and `overlay.py`: focused
@@ -223,7 +227,11 @@ This project does not use unit tests. Do not add, restore, or run unit tests,
 including mock-based suites disguised as self-checks. Keep build scripts and
 CI workflows free of unit-test runners. This persistent rule is recorded in
 [AGENTS.md](AGENTS.md). Use the existing launcher installation/domain self-checks,
-campaign-map audits, and manual gameplay checks for validation.
+campaign-map audits, and manual gameplay checks for validation. Consult the
+[command registry](docs/DEVELOPMENT_WORKFLOW.md#command-registry) before invoking
+legacy audit drivers: the campaign driver currently mixes synthetic assertions
+with real-map work and assumes exactly 97 campaigns; it is not an approved blanket
+gate for the 127-map installation.
 
 Routine:
 

@@ -96,6 +96,8 @@ This project was developed with assistance from OpenAI's ChatGPT, including Code
 
 ## Documentation
 
+Contributors: start with [the repository workflow and documentation index](docs/README.md).
+
 Each document has one purpose so the same behavior is not maintained in several places.
 
 | Document | Audience | Authoritative content |

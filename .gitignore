@@ -40,3 +40,17 @@ configs/player/mental_omega_randomizer.yaml
 config/mental_omega_randomizer.yaml
 PROJECT_CONTEXT.md
 assets/Campaign Only Units For All Factions.ini
+
+# Local development environments, secrets and independent source-run saves.
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+/runs/
+/recordings/
+/tmp/
