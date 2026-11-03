@@ -48,11 +48,18 @@ class ShopArchipelagoController:
             panels.forget(panel)
 
     def _shop_campaign_missions(self, campaign):
-        if campaign == CAMPAIGN_FILTERS[0]:
-            return [mission for mission in self.missions if not is_challenge(mission)]
+        """Select Shop's native launch contract from the installed union.
+
+        Challenges have no Shop contract. Optional progression skirmishes are
+        appended separately after this selection, for solo Shop only.
+        """
+        cooperative = bool(self.coop_mode_var.get())
         return [
             mission for mission in self.missions
-            if not is_challenge(mission) and normalize_faction(mission.get('side', '')) == campaign
+            if not is_challenge(mission) and not mission.get('skirmish')
+            and bool(mission.get('coop_name')) == cooperative
+            and (campaign == CAMPAIGN_FILTERS[0]
+                 or normalize_faction(mission.get('side', '')) == campaign)
         ]
 
     def filtered_missions_for_seed(self):

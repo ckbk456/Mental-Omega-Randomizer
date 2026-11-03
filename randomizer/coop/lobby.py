@@ -20,7 +20,7 @@ from randomizer.coop.runtime import installation_details, validate_runtime
 
 
 LOBBY_PORT = 19420
-PROTOCOL = 5
+PROTOCOL = 6
 MAX_WIRE = 8 * 1024 * 1024
 MAX_STATE = 32 * 1024 * 1024
 
@@ -40,7 +40,7 @@ def decode_state(encoded: str) -> dict:
         raise ValueError('Shared run state is invalid or too large.')
     state = json.loads(raw)
     if not isinstance(state, dict) or not (
-            state.get('coop_mode') or state.get('mission_category') == 'mixed'):
+            state.get('coop_mode') or state.get('mission_category') in {'mixed', 'challenge'}):
         raise ValueError('Host did not send a co-op run.')
     return state
 
@@ -180,7 +180,7 @@ class Lobby:
                 else (peer_nonce, local_nonce)
             )
             def proof(role):
-                payload = f'coop-lobby-v5:{role}:{host_nonce}:{guest_nonce}'.encode('ascii')
+                payload = f'coop-lobby-v6:{role}:{host_nonce}:{guest_nonce}'.encode('ascii')
                 return hmac.new(self.pairing_code.encode('utf-8'), payload,
                                 hashlib.sha256).hexdigest()
             self._send_raw({'type': 'proof', 'value': proof(self.role)})

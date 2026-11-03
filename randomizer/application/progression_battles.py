@@ -249,13 +249,13 @@ class ProgressionBattlesController:
         if campaign in {'GDI', 'Nod', 'Allies', 'Soviet', 'Soviets', 'Yuri', 'Epsilon', 'Foehn'}:
             factions = {campaign}
         enabled = bool(self.include_skirmishes_var.get() and mode in ('Shop Mode', 'Grid Mode')
-                       and not self.coop_mode_var.get() and not self.archipelago_run_active())
+                       and self.selected_setup_category() != 'coop' and not self.archipelago_run_active())
         return select_pool(native, catalogue, enabled=enabled, factions=factions,
                            excluded=getattr(self, 'excluded_mission_codes', ()))
 
     def filtered_missions_for_seed(self):
         missions = super().filtered_missions_for_seed()
-        return self._with_skirmish_pool(missions, self.progression_mode_var.get(), self.campaign_var.get())
+        return self._with_skirmish_pool(missions, self.progression_mode_var.get(), self.effective_setup_campaign())
 
     def visible_missions(self):
         visible = super().visible_missions()

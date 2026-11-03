@@ -41,6 +41,7 @@ from ._dependencies import (
     valid_choice,
 )
 
+from .setup_flow_controller import SetupFlowController
 from .run_library_controller import RunLibraryController
 from .window import WindowController
 from .update_controller import UpdateController
@@ -66,6 +67,7 @@ from .progression_battles import ProgressionBattlesController
 
 
 class LauncherApp(
+    SetupFlowController,
     RunLibraryController,
     ProgressionBattlesController,
     UpdateController,
@@ -387,13 +389,14 @@ class LauncherApp(
             category == 'coop' or (category == 'challenge'
                                   and self.challenge_player_count_var.get() == '2')
         ))
-        if self.state.get('mission_category') == 'mixed':
-            self.mission_category_var.set('mixed')
+        if self.state:
+            self.mission_category_var.set(self.state.get('mission_category') or (
+                'coop' if self.state.get('coop_mode') else 'campaign'))
             shop_selected = self.progression_mode_var.get() == 'Shop Mode'
-            self.coop_mode_var.set(bool(shop_selected and self.config.get('shop_coop_mode', False)))
+            self.coop_mode_var.set(bool(
+                self.config.get('shop_coop_mode', self.config.get('coop_mode', False))
+                if shop_selected else self.state.get('coop_mode', False)))
             self._shop_from_mixed = shop_selected
-        if category == 'challenge' and self.progression_mode_var.get() == 'Shop Mode':
-            self.progression_mode_var.set('Grid Mode')
         grid_state = self.state.get('grid', {}) if isinstance(self.state.get('grid'), dict) else {}
         self.grid_two_starts_var = tk.BooleanVar(
             value=bool(grid_state.get(

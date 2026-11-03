@@ -715,8 +715,8 @@ def _build_gameplay_settings(self, settings_frame):
     self.settings_intro_label = ttk.Label(
         settings_frame,
         text=(
-            'Choose your next run here. Its pool, progression and rewards stay fixed once generated. '
-            'Change your party and challenge houses between missions; appearance applies immediately.'
+            'Choose modes, select compatible missions, then generate a run. '
+            'Set up players before launching. Existing runs keep their saved pool and rewards.'
         ),
         wraplength=700,
         style='Muted.TLabel',
@@ -729,7 +729,7 @@ def _build_gameplay_settings(self, settings_frame):
         padding=(8, 8, 8, 8),
     )
     self.map_colors_frame = map_colors_frame
-    map_colors_frame.grid(row=0, column=0, sticky='ew')
+    map_colors_frame.grid(row=1, column=0, sticky='ew', pady=(12, 0))
     map_colors_frame.columnconfigure(1, weight=1)
     ttk.Label(map_colors_frame, text='Player color').grid(
         row=0, column=0, sticky='w', padx=(0, 8)
@@ -779,7 +779,7 @@ def _build_gameplay_settings(self, settings_frame):
 
     mission_pool_frame = self.mission_pool_frame
     mission_pool_frame.grid(row=3, column=0, sticky='ew', pady=(8, 0))
-    build_coop_controls(self, self.mission_appearance_column, 1)
+    build_coop_controls(self, self.mission_appearance_column, 0)
     self.include_no_build_missions_check = ttk.Checkbutton(
         mission_pool_frame,
         text='Include true no-build / fixed-unit missions',

@@ -80,10 +80,12 @@ class WindowController:
     def update_header_summary(self, *_args):
         """Show the core selected run settings beneath the launcher title."""
         seed = self.current_display_seed()
+        active = self.state if not self.shop_mode_selected() else {}
         parts = [
-            ('Mixed mission pool' if self.state.get('mission_category') == 'mixed' else self.campaign_var.get()),
-            self.reward_mode_var.get(),
-            self.progression_mode_var.get(),
+            ('Mixed mission pool' if active.get('mission_category') == 'mixed'
+             else active.get('campaign_filter', self.campaign_var.get())),
+            active.get('reward_mode', self.reward_mode_var.get()),
+            active.get('progression_mode', self.progression_mode_var.get()),
             self.difficulty_var.get(),
         ]
         if self.selected_mission_category() == 'challenge':
@@ -620,146 +622,107 @@ class WindowController:
             self.settings_viewport._schedule_resize()
 
     def layout_settings_sections(self, width):
-        """Use two Settings columns when workspace width can support them."""
-        normal_names = (
-            'settings_intro_label',
-            'mission_pool_frame',
-            'seed_settings_frame',
-            'mission_appearance_column',
-            'reward_frame',
-            'arsenal_frame',
-            'buff_frame',
-            'power_buff_frame',
-            'weight_settings_frame',
-            'assistance_frame',
-            'appearance_frame',
+        """Keep mode → compatible pool → run rules → players in one order."""
+        section_names = (
+            'settings_intro_label', 'setup_mode_frame', 'mission_pool_frame',
+            'seed_settings_frame', 'reward_frame', 'arsenal_frame', 'buff_frame',
+            'power_buff_frame', 'weight_settings_frame', 'assistance_frame',
+            'setup_actions_frame', 'mission_appearance_column',
+            'appearance_frame', 'shop_settings_frame',
         )
-        required = (*normal_names, 'shop_settings_frame', 'fortress_mode_settings_frame')
+        required = (*section_names, 'coop_controls_frame', 'shop_coop_row')
         if not all(hasattr(self, name) for name in required):
             return
+        # This controller owns section placement. SetupFlow owns which controls
+        # exist inside those sections, based on the draft rather than the save.
+        self.refresh_setup_flow()
         fortress_mode = self.final_fortress_mode_selected()
-        shop_mode = not fortress_mode and self.progression_mode_var.get() == 'Shop Mode'
+        shop_mode = not fortress_mode and self.shop_mode_selected()
         self.coop_controls_frame.grid_remove() if shop_mode else self.coop_controls_frame.grid()
         self.shop_coop_row.grid() if shop_mode else self.shop_coop_row.grid_remove()
         left_width = max(self.seed_settings_frame.winfo_reqwidth(),
-                         self.reward_frame.winfo_reqwidth())
-        right_width = max(self.mission_appearance_column.winfo_reqwidth(),
-                          self.assistance_frame.winfo_reqwidth(),
-                          self.appearance_frame.winfo_reqwidth())
-        wide = int(width or 0) >= max(840, left_width + right_width + 32)
+                         self.mission_appearance_column.winfo_reqwidth(),
+                         self.assistance_frame.winfo_reqwidth())
+        right_width = max(self.reward_frame.winfo_reqwidth(),
+                          self.appearance_frame.winfo_reqwidth(),
+                          self.arsenal_frame.winfo_reqwidth()
+                          if self.reward_mode_var.get() == 'Randomizer Arsenal' else 0)
+        padding = tuple(self.winfo_pixels(str(value)) for value in
+                        self.settings_frame.cget('padding'))
+        horizontal_padding = (padding[0] + padding[2] if len(padding) >= 3 else
+                              padding[0] * 2 if padding else 0)
+        wide = int(width or 0) >= max(
+            840, left_width + right_width + 16 + horizontal_padding)
         buff_columns = 1 if int(width or 0) < 600 else 2
-        layout_signature = (fortress_mode, shop_mode, wide, buff_columns)
+        layout_signature = (fortress_mode, shop_mode, wide, buff_columns,
+                            self.reward_mode_var.get(), getattr(self, '_setup_flow_signature', None))
         if self.__dict__.get('_settings_layout_signature') == layout_signature:
             return
         self._settings_layout_signature = layout_signature
-        widgets = [getattr(self, name) for name in required]
-        for widget in widgets:
-            widget.grid_forget()
+        # fortress_mode_settings_frame is an alias for setup_mode_frame. Use
+        # only canonical section names so the shared card is never laid out twice.
+        for name in section_names:
+            getattr(self, name).grid_remove()
 
         normal_intro = self.__dict__.setdefault(
             '_campaign_settings_intro_text', self.settings_intro_label.cget('text'))
         self.settings_intro_label.configure(text=(
-            'Choose a game mode, configure Final Fortress co-op and launcher appearance. '
-            'Defense setup and permanent perks are in the Final Fortress tab.'
+            'Choose your mode here. Defense maps and permanent perks are in Final Fortress; '
+            'configure human teammates below before launching.'
             if fortress_mode else normal_intro))
         self.appearance_frame.configure(
             text='Appearance' if fortress_mode else 'Appearance & Hidden Settings')
-        for widget in (self.map_colors_frame, self.hide_reward_details_check,
-                       self.hide_locked_grid_missions_check):
+        for widget in (self.hide_reward_details_check, self.hide_locked_grid_missions_check):
             widget.grid_remove() if fortress_mode else widget.grid()
 
-        if fortress_mode:
-            self.settings_frame.columnconfigure(0, weight=1, uniform='')
-            self.settings_frame.columnconfigure(1, weight=1 if wide else 0, uniform='')
-            self.settings_intro_label.grid(
-                row=0, column=0, columnspan=2 if wide else 1,
-                sticky='ew', pady=(0, 8))
-            self.fortress_mode_settings_frame.grid(
-                row=1, column=0, columnspan=2 if wide else 1,
-                sticky='ew', pady=(0, 8))
-            self.mission_appearance_column.grid(
-                row=2, column=0, sticky='new', padx=(0, 4) if wide else 0)
-            self.appearance_frame.grid(
-                row=2 if wide else 3, column=1 if wide else 0,
-                sticky='new', padx=(4, 0) if wide else 0, pady=(8, 0))
-            self.on_settings_content_configure()
-            return
-
-        if shop_mode:
-            self.settings_frame.columnconfigure(0, weight=1, uniform='')
-            self.settings_frame.columnconfigure(1, weight=0, uniform='')
-            self.shop_settings_frame.grid(
-                row=0, column=0, sticky='new'
-            )
-            self.on_settings_content_configure()
-            return
-
-        self.settings_frame.columnconfigure(
-            0, weight=7 if wide else 1, uniform=''
-        )
-        self.settings_frame.columnconfigure(
-            1, weight=5 if wide else 0, uniform=''
-        )
+        columns = 2 if wide and not shop_mode else 1
+        self.settings_frame.columnconfigure(0, weight=7 if columns == 2 else 1, uniform='')
+        self.settings_frame.columnconfigure(1, weight=5 if columns == 2 else 0, uniform='')
         self.settings_intro_label.grid(
-            row=0,
-            column=0,
-            columnspan=2 if wide else 1,
-            sticky='ew',
-            pady=(0, 8),
+            row=0, column=0, columnspan=columns, sticky='ew', padx=0, pady=(0, 8),
         )
-        if wide:
-            self.seed_settings_frame.grid(
-                row=2, column=0, columnspan=1, sticky='nsew', padx=(0, 8)
-            )
+        self.setup_mode_frame.grid(
+            row=1, column=0, columnspan=columns, sticky='ew', padx=0, pady=(0, 12),
+        )
+        if shop_mode:
+            self.shop_settings_frame.grid(
+                row=2, column=0, columnspan=1, sticky='new', padx=0, pady=0)
+        elif fortress_mode:
             self.mission_appearance_column.grid(
-                row=2, column=1, columnspan=1, sticky='new', padx=(8, 0)
-            )
-            self.mission_pool_frame.grid(
-                row=1, column=0, columnspan=2, sticky='nsew', padx=0, pady=(8, 16)
-            )
-            self.assistance_frame.grid(
-                row=3, column=1, columnspan=1, sticky='nsew', padx=(8, 0), pady=(12, 0)
-            )
-            self.reward_frame.grid(
-                row=3, column=0, sticky='nsew', padx=(0, 4), pady=(8, 0)
+                row=2, column=0, columnspan=1, sticky='new',
+                padx=(0, 8) if wide else 0, pady=0,
             )
             self.appearance_frame.grid(
-                row=4, column=1, columnspan=1, sticky='new', padx=(8, 0), pady=(12, 0)
-            )
-            self.buff_frame.grid(
-                row=5,
-                column=0,
-                columnspan=2,
-                sticky='nsew',
-                pady=(8, 0),
-            )
-            self.arsenal_frame.grid(
-                row=6,
-                column=0,
-                columnspan=2,
-                sticky='nsew',
-                pady=(8, 0),
-            )
-            self.power_buff_frame.grid(
-                row=7,
-                column=0,
-                columnspan=2,
-                sticky='nsew',
-                pady=(8, 0),
-            )
-            self.weight_settings_frame.grid(
-                row=8,
-                column=0,
-                columnspan=2,
-                sticky='nsew',
-                pady=(8, 0),
+                row=2 if wide else 3, column=1 if wide else 0, columnspan=1,
+                sticky='new', padx=(8, 0) if wide else 0, pady=0 if wide else (12, 0),
             )
         else:
-            normal_widgets = [getattr(self, name) for name in normal_names]
-            for row, widget in enumerate(normal_widgets[1:], start=1):
-                widget.grid(row=row, column=0, columnspan=1, sticky='ew', padx=0, pady=(12, 0))
-        if self.reward_mode_var.get() != 'Randomizer Arsenal':
-            self.arsenal_frame.grid_remove()
+            self.mission_pool_frame.grid(
+                row=2, column=0, columnspan=columns, sticky='ew', padx=0, pady=(0, 12))
+            if wide:
+                rows = (
+                    ('seed_settings_frame', 3, 0, 1), ('reward_frame', 3, 1, 1),
+                    ('assistance_frame', 4, 0, 1), ('arsenal_frame', 4, 1, 1),
+                    ('buff_frame', 5, 0, 2), ('power_buff_frame', 6, 0, 2),
+                    ('weight_settings_frame', 7, 0, 2),
+                    ('setup_actions_frame', 8, 0, 2),
+                    ('mission_appearance_column', 9, 0, 1), ('appearance_frame', 9, 1, 1),
+                )
+            else:
+                rows = tuple((name, row, 0, 1) for row, name in enumerate((
+                    'seed_settings_frame', 'reward_frame', 'arsenal_frame',
+                    'buff_frame', 'power_buff_frame', 'weight_settings_frame',
+                    'assistance_frame', 'setup_actions_frame',
+                    'mission_appearance_column', 'appearance_frame',
+                ), start=3))
+            for name, row, column, span in rows:
+                padding = (0, 8) if wide and span == 1 and column == 0 else (
+                    (8, 0) if wide and span == 1 else 0)
+                getattr(self, name).grid(
+                    row=row, column=column, columnspan=span, sticky='new',
+                    padx=padding, pady=(0, 12))
+            if self.reward_mode_var.get() != 'Randomizer Arsenal':
+                self.arsenal_frame.grid_remove()
         for frame, checks in (
             (self.buff_frame, self.buff_type_checks),
             (self.power_buff_frame, self.power_buff_type_checks),
@@ -791,6 +754,12 @@ class WindowController:
                     (event.width // 2 if event.width >= 720 else event.width) - 64,
                 )
             )
+        # Wrapped descriptions update their requested geometry at idle. Recheck
+        # the column breakpoint after that update so their new width cannot
+        # push the shared mode and pool cards outside the viewport.
+        if event.width != getattr(self, '_settings_wrap_width', None):
+            self._settings_wrap_width = event.width
+            self.after_idle(lambda: self.layout_settings_sections(self.settings_canvas.winfo_width()))
         self.on_settings_content_configure()
 
     def on_settings_control_mousewheel(self, event):

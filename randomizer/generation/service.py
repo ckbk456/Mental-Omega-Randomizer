@@ -8,7 +8,9 @@ from randomizer.rewards.arsenal import ARSENAL_MODE
 from randomizer.rewards.catalogue import MAX_REWARDS_PER_CHECK
 from randomizer.ui.config import CAMPAIGN_FILTERS, PROGRESSION_MODES, REWARD_MODES
 from randomizer.missions.pool import select_mission_pool
-from randomizer.missions.unified import validate_mixed_generation
+from randomizer.missions.unified import (
+    APRA2_OPERATION_CODES, pool_selection_from_settings, validate_mixed_generation,
+)
 from .reward_controller import RewardGeneration
 from .seed_controller import SeedGeneration
 from .starting_unlocks import StartingUnlocks
@@ -57,8 +59,12 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
         mode = config['progression_mode']
         campaign = config['campaign_filter']
         reward_mode = generation['reward_mode']
-        selection = (validate_mixed_generation(config.get('mission_pool_selection'), mode)
-                     if config['mission_category'] == 'mixed' else None)
+        selection = (validate_mixed_generation(pool_selection_from_settings(
+            config.get('mission_pool_selection'),
+            include_operations=bool(generation.get('include_operation_missions', True)),
+        ), mode) if config['mission_category'] == 'mixed' else None)
+        if selection is not None:
+            config['mission_pool_selection'] = selection
         if config['mission_category'] == 'challenge' and mode == 'Shop Mode':
             raise ValueError('Challenges currently support Classic, Grid Mode and Mission List.')
         for name, value, choices in (
@@ -95,6 +101,7 @@ class RunGenerator(SeedGeneration, RewardGeneration, GenerationSettings, Startin
             include_true_no_build=mission_settings['include_no_build_missions'],
             include_no_build_production=mission_settings['include_no_build_production_missions'],
             include_operation_missions=mission_settings['include_operation_missions'],
+            operation_exempt_codes=APRA2_OPERATION_CODES if selection is not None else (),
         )
         if not missions:
             raise ValueError('Selected settings leave no missions to generate.')

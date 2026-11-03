@@ -654,6 +654,8 @@ class StateController(GenerationSettings):
         self.config['mission_category'] = self.selected_mission_category()
         if hasattr(self, 'mission_pool_selection'):
             self.config['mission_pool_selection'] = self.mission_pool_selection
+        if hasattr(self, 'setup_category_var'):
+            self.config['setup_mission_category'] = self.setup_category_var.get()
         self.config['challenge_player_count'] = self.selected_challenge_player_count()
         self.config['challenge_country'] = self.challenge_country_var.get()
         self.store_challenge_local_options()
@@ -825,7 +827,10 @@ class StateController(GenerationSettings):
         if self.challenge_launch_active():
             messagebox.showinfo('Challenges', 'Close the current challenge before loading settings.')
             return
-        if self.gameplay_settings_locked() or getattr(self, '_coop_lobby', None):
+        if self.run_switch_locked():
+            messagebox.showinfo('Load Settings',
+                                'Finish the current match and leave the party before loading settings.',
+                                parent=self)
             return
         path = filedialog.askopenfilename(
             parent=self,
@@ -1108,6 +1113,27 @@ class StateController(GenerationSettings):
                 weights['power_buffs'][weight_id]
             )
 
+        if hasattr(self, 'setup_category_var'):
+            setup_category = self.config.get('setup_mission_category')
+            if setup_category not in ('Campaign', 'Co-op', 'Challenges'):
+                setup_category = {'coop': 'Co-op', 'challenge': 'Challenges'}.get(category, 'Campaign')
+            self.setup_category_var.set(setup_category)
+            self.config['setup_mission_category'] = setup_category
+        # Imported settings describe the next run. Keep the active run's
+        # transport and identity intact instead of loading a different save.
+        if self.state and not self.archipelago_run_active():
+            self.mission_category_var.set(self.state.get('mission_category') or (
+                'coop' if self.state.get('coop_mode') else 'campaign'))
+            self.challenge_player_count_var.set(str(self.state.get('challenge_player_count', 1)))
+            if self.shop_mode_selected():
+                self.coop_mode_var.set(bool(self.config.get('shop_coop_mode', self.config.get('coop_mode', False))))
+                self._shop_from_mixed = True
+                self.select_shop_repository()
+            else:
+                self.coop_mode_var.set(bool(self.state.get('coop_mode', False)))
+                self.__dict__.pop('_shop_from_mixed', None)
+        self.game_mode_var.set(self.progression_mode_var.get())
+        self.on_game_mode_changed()
         save_config(self.config)
         self.apply_color_mode()
         self.refresh_setting_states()
@@ -1117,11 +1143,9 @@ class StateController(GenerationSettings):
         self.grid_render_signature = None
         self.unlock_dashboard_signature = None
         self.refresh_progress_view()
+        self.sync_shop_workspace()
         self.refresh_coop_controls()
-        if previous_setup != self.selected_mission_setup():
-            if self.archipelago_run_active():
-                # Signed server state already selected the pool. Switching
-                # presentation must not reload a standalone save over it.
-                self.refresh_missions()
-            else:
-                self.on_coop_mode_changed()
+        if self.archipelago_run_active() and previous_setup != self.selected_mission_setup():
+            # Signed server state already selected the pool. Refresh its
+            # presentation without replacing it with a standalone save.
+            self.refresh_missions()

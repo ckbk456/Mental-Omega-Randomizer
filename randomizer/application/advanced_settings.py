@@ -276,7 +276,7 @@ class AdvancedSettingsController:
             and payload_power_ids.issubset(self.excluded_superweapon_ids)
         ):
             return False
-        selected_campaign = self.campaign_var.get()
+        selected_campaign = self.effective_setup_campaign()
         if self.reward_mode_var.get() == ARSENAL_MODE:
             selected_factions = {
                 faction for faction, variable in self.arsenal_faction_vars.items()
@@ -607,7 +607,9 @@ class AdvancedSettingsController:
             'units': self.excluded_unit_access_ids,
             'powers': self.excluded_superweapon_ids,
         }
-        excluded = entry['id'] in excluded_sets[pool_key]
+        read_only = self.archipelago_run_active()
+        excluded = (entry['id'] in excluded_sets[pool_key]
+                    and not (read_only and pool_key == 'missions'))
         faction = entry.get('faction', '')
         base_color = FACTION_TILE_COLORS.get(faction, '#315b82')
         border = '#777777' if excluded else '#4d92d8'
@@ -619,7 +621,7 @@ class AdvancedSettingsController:
             highlightbackground=border,
             highlightcolor=border,
             background=base_color,
-            cursor='hand2',
+            cursor='arrow' if read_only else 'hand2',
         )
         card.grid(row=row, column=column, padx=4, pady=4, sticky='nw')
         if photo is not None:
@@ -658,8 +660,21 @@ class AdvancedSettingsController:
                 self.on_unlock_mousewheel(event, target)
             ),
         )
-        status = 'Excluded from next seeds' if excluded else 'Included in next seeds'
+        status = ('Archipelago controls this pool (read only)' if read_only else
+                  'Excluded from next seeds' if excluded else 'Included in next seeds')
         WidgetTooltip(card, f'{entry["label"]} ({entry["id"]})\n{status}')
+
+    def advanced_mission_pool(self):
+        missions = self.mission_pool_candidates(apply_exclusions=False)
+        if self.archipelago_run_active():
+            return missions
+        return filter_missions_by_build_settings(
+            missions,
+            include_true_no_build=self.include_no_build_missions_var.get(),
+            include_no_build_production=self.include_no_build_production_missions_var.get(),
+            include_operation_missions=self.include_operation_missions_var.get(),
+            operation_exempt_codes=self.mission_pool_operation_exemptions(),
+        )
 
     def refresh_advanced_pool_views(self, pool_key=None):
         if not hasattr(self, 'advanced_pool_frames'):
@@ -677,7 +692,7 @@ class AdvancedSettingsController:
             for child in frame.winfo_children():
                 child.destroy()
 
-        selected_campaign = self.campaign_var.get()
+        selected_campaign = self.effective_setup_campaign()
         arsenal_mode = self.reward_mode_var.get() == ARSENAL_MODE
         arsenal_factions = {
             faction for faction, variable in self.arsenal_faction_vars.items()
@@ -696,15 +711,7 @@ class AdvancedSettingsController:
                 or entry.get('faction') == selected_campaign
             )
 
-        campaign_missions = self.mission_pool_candidates(apply_exclusions=False)
-        visible_missions = filter_missions_by_build_settings(
-            campaign_missions,
-            include_true_no_build=self.include_no_build_missions_var.get(),
-            include_no_build_production=(
-                self.include_no_build_production_missions_var.get()
-            ),
-            include_operation_missions=self.include_operation_missions_var.get(),
-        )
+        visible_missions = self.advanced_mission_pool()
         displayed_missions = [
             mission for mission in visible_missions
             if self.advanced_search_matches(
@@ -881,10 +888,12 @@ class AdvancedSettingsController:
         if pool_key is not None:
             return
 
-        included_missions = len(visible_missions) - len(
-            {mission['code'].upper() for mission in visible_missions}
-            & self.active_mission_exclusions()
-        )
+        included_missions = len(visible_missions)
+        if not self.archipelago_run_active():
+            included_missions -= len(
+                {mission['code'].upper() for mission in visible_missions}
+                & self.active_mission_exclusions()
+            )
         visible_unit_ids = {entry['id'] for entry in unit_entries}
         included_units = len(visible_unit_ids - self.excluded_unit_access_ids)
         visible_power_ids = {entry['id'] for entry in power_entries}
@@ -904,10 +913,14 @@ class AdvancedSettingsController:
                 )
             )
         )
+        if self.archipelago_run_active():
+            self.advanced_pool_status_label.configure(
+                text=f'Archipelago: {len(visible_missions)} server missions; pool controls are read-only.'
+            )
         self.refresh_access_limit_controls()
 
     def toggle_advanced_pool_entry(self, pool_key, item_id):
-        if self.gameplay_settings_locked():
+        if self.archipelago_run_active() or self.gameplay_settings_locked():
             return
         target = {
             'missions': self.active_mission_exclusions(),
@@ -924,7 +937,7 @@ class AdvancedSettingsController:
         self.refresh_advanced_pool_views()
 
     def set_advanced_pool_all(self, pool_key, include):
-        if self.gameplay_settings_locked():
+        if self.archipelago_run_active() or self.gameplay_settings_locked():
             return
         entries, target = self.advanced_pool_bulk_entries(pool_key)
         all_ids = {
@@ -952,18 +965,9 @@ class AdvancedSettingsController:
                     'mission_category': mission.get('mission_category'),
                     'special': bool(mission.get('operation')),
                 }
-                for mission in filter_missions_by_build_settings(
-                    self.mission_pool_candidates(apply_exclusions=False),
-                    include_true_no_build=self.include_no_build_missions_var.get(),
-                    include_no_build_production=(
-                        self.include_no_build_production_missions_var.get()
-                    ),
-                    include_operation_missions=(
-                        self.include_operation_missions_var.get()
-                    ),
-                )
+                for mission in self.advanced_mission_pool()
             ]
-            return entries, self.active_mission_exclusions()
+            return entries, set() if self.archipelago_run_active() else self.active_mission_exclusions()
         if pool_key == 'units':
             entries = [
                 {
@@ -1043,8 +1047,8 @@ class AdvancedSettingsController:
     def advanced_pool_entry_is_visible(self, entry):
         """Match the campaign/Arsenal scope already used by Advanced cards."""
         if entry.get('mission_category') == 'challenge':
-            return self.selected_mission_category() == 'challenge' or self.optional_challenges_enabled()
-        selected_campaign = self.campaign_var.get()
+            return self.selected_setup_category() in {'challenge', 'mixed'} or self.optional_challenges_enabled()
+        selected_campaign = self.effective_setup_campaign()
         arsenal_mode = self.reward_mode_var.get() == ARSENAL_MODE
         arsenal_factions = {
             faction for faction, variable in self.arsenal_faction_vars.items()
@@ -1063,7 +1067,7 @@ class AdvancedSettingsController:
 
     def set_advanced_pool_only(self, pool_key, selector):
         """Include one faction/category; exclude other eligible pool entries."""
-        if self.gameplay_settings_locked():
+        if self.archipelago_run_active() or self.gameplay_settings_locked():
             return
         entries, target = self.advanced_pool_bulk_entries(pool_key)
         scope = [
@@ -1090,7 +1094,7 @@ class AdvancedSettingsController:
 
     def set_advanced_pool_group(self, pool_key, group_type, value, include):
         """Bulk-toggle one faction/category without changing other entries."""
-        if self.gameplay_settings_locked():
+        if self.archipelago_run_active() or self.gameplay_settings_locked():
             return
         entries, target = self.advanced_pool_bulk_entries(pool_key)
         scope = [
@@ -1125,7 +1129,7 @@ class AdvancedSettingsController:
         include,
     ):
         """Bulk-toggle a faction/category intersection or the whole faction."""
-        if self.gameplay_settings_locked():
+        if self.archipelago_run_active() or self.gameplay_settings_locked():
             return
         entries, target = self.advanced_pool_bulk_entries(pool_key)
         matching_ids = {
@@ -1233,7 +1237,7 @@ class AdvancedSettingsController:
         else:
             self.randomize_unit_access_check.configure(state='normal')
         if chaos_mode or (
-            not arsenal_mode and self.campaign_var.get() == 'All Campaigns'
+            not arsenal_mode and self.effective_setup_campaign() == 'All Campaigns'
         ):
             self.share_chaos_role_buffs_check.grid()
         else:
@@ -1430,7 +1434,7 @@ class AdvancedSettingsController:
         if not self.missions:
             return
         candidates = self.filtered_missions_for_seed()
-        flexible = (self.progression_mode_var.get() in {'Grid Mode', 'Mission List'}
+        flexible = (self.selected_setup_category() == 'mixed'
                     and self.mission_pool_selection.get('cooperative_policy') == 'flexible')
         filtered_count = sum(not mission.get('coop_name') or bool(mission.get('challenge_name'))
                              for mission in candidates) if flexible else len(candidates)

@@ -106,7 +106,7 @@ class StartingUnlocksController(StartingUnlocks):
                     selected_factions | {'Neutral'}
                 )
             )
-        selected = self.campaign_var.get()
+        selected = self.effective_setup_campaign()
         factions = set(entry['factions'])
         if selected == CAMPAIGN_FILTERS[0]:
             return True

@@ -9,9 +9,9 @@ from randomizer.ui.tooltips import WidgetTooltip
 
 
 def build_coop_controls(self, parent, row, *, shop=False):
-    """Group co-op, optional challenges, player setup, and connection."""
+    """Keep player choices here; mission inclusion belongs to the pool step."""
     frame = ttk.LabelFrame(
-        parent, text='Co-op' if shop else 'Party & mission setup', padding=14,
+        parent, text='4. Party & mission setup', padding=14,
     )
     frame.columnconfigure(1, weight=1)
     frame.grid(row=row, column=0, columnspan=2 if shop else 1,
@@ -24,23 +24,33 @@ def build_coop_controls(self, parent, row, *, shop=False):
         wraplength=360, justify='left',
     )
     party_summary.grid(row=7, column=0, columnspan=3, sticky='ew', pady=(12, 0))
+    pool_type = self.shop_mission_type_frame if shop else self.legacy_mission_type_frame
     toggle = ttk.Checkbutton(
-        frame, text='Co-op', variable=self.coop_mode_var,
+        pool_type, text='Use native co-op missions', variable=self.coop_mode_var,
         command=self.on_coop_checkbox_changed,
     )
     toggle.grid(row=0, column=0, columnspan=3, sticky='w')
+    if not shop:
+        # The Classic category selector owns next-run selection. This retained
+        # control is only a compatibility handle for older controller code.
+        toggle.grid_remove()
     toggle_tooltip = WidgetTooltip(toggle, 'Off: solo campaign missions. On: two-player co-op missions.')
-    include = ttk.Checkbutton(
-        frame, text='Include challenge maps',
-        variable=self.include_challenge_missions_var,
-        command=self.on_mission_pool_settings_changed,
-    )
-    include.grid(row=1, column=0, columnspan=3, sticky='w', pady=(5, 0))
-    WidgetTooltip(
-        include,
-        'Adds installed challenges to the next seed. Mission goal and Advanced exclusions apply. '
-        'Available in standalone Grid Mode, Mission List and Classic.',
-    )
+    include = None
+    if not shop:
+        include = ttk.Checkbutton(
+            pool_type, text='Also include challenge maps',
+            variable=self.include_challenge_missions_var,
+            command=self.on_mission_pool_settings_changed,
+        )
+        include.grid(row=1, column=0, columnspan=3, sticky='w', pady=(5, 0))
+        WidgetTooltip(include, 'Adds native challenges to the next Classic run. '
+                      'Grid and Mission List use the category matrix instead.')
+        self.fortress_coop_mode_check = ttk.Checkbutton(
+            frame, text='Play with human teammates', variable=self.final_fortress_coop_var,
+            command=self.on_fortress_coop_mode_changed,
+        )
+        self.fortress_coop_mode_check.grid(row=0, column=0, columnspan=3, sticky='w')
+        self.fortress_coop_mode_check.grid_remove()
     player_label = ttk.Label(frame, text='Human players (legacy run)')
     player_label.grid(row=3, column=0, sticky='w', pady=(5, 0))
     count = ttk.Combobox(

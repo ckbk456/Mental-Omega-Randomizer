@@ -77,9 +77,7 @@ class SeedController(SeedGeneration):
         """Validate live controls and freeze one exact generation request."""
         if self.gameplay_settings_locked():
             return None
-        category = self.selected_mission_category()
-        if self.progression_mode_var.get() in {'Grid Mode', 'Mission List'}:
-            category = 'mixed'
+        category = self.selected_setup_category()
         if category == 'mixed' and self.progression_mode_var.get() not in {'Grid Mode', 'Mission List'}:
             messagebox.showinfo('Mission pool', 'The unified mission pool supports Grid Mode and Mission List. Legacy Classic, Shop and Final Fortress keep their own setup.')
             return None
@@ -237,9 +235,9 @@ class SeedController(SeedGeneration):
             'starting_defense_ids': starting_defense_ids,
             'starting_unit_ids': starting_unit_ids,
             'progression_mode': self.progression_mode_var.get(),
-            'coop_mode': category != 'mixed' and bool(self.coop_mode_var.get()),
+            'coop_mode': category == 'coop',
             'mission_category': category,
-            'challenge_player_count': int(self.challenge_player_count_var.get()),
+            'challenge_player_count': 2 if category == 'coop' else 1,
             'two_start_positions': bool(self.grid_two_starts_var.get()),
             'mission_pool_settings': {
                 'include_skirmishes': bool(self.include_skirmishes_var.get()),
@@ -269,6 +267,7 @@ class SeedController(SeedGeneration):
         if self.state:
             self.save_state()
         self.state = result['state']
+        self.challenge_player_count_var.set(str(self.state.get('challenge_player_count', 1)))
         self.mission_category_var.set(self.state.get('mission_category', 'campaign'))
         self.coop_mode_var.set(bool(self.state.get('coop_mode', False)))
         self.campaign_var.set(self.state.get('campaign_filter', 'All Campaigns'))
@@ -650,6 +649,8 @@ class SeedController(SeedGeneration):
 
     def filtered_missions_for_seed(self):
         missions = self.mission_pool_candidates()
+        if self.archipelago_run_active():
+            return missions
         return filter_missions_by_build_settings(
             missions,
             include_true_no_build=self.include_no_build_missions_var.get(),
@@ -657,6 +658,7 @@ class SeedController(SeedGeneration):
                 self.include_no_build_production_missions_var.get()
             ),
             include_operation_missions=self.include_operation_missions_var.get(),
+            operation_exempt_codes=self.mission_pool_operation_exemptions(),
         )
 
     def randomizer_order_map(self):

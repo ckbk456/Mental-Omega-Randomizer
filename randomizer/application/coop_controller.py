@@ -38,13 +38,19 @@ def normalize_network_mode(value):
 
 class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectionController):
     def party_connection_available(self):
+        if self.final_fortress_mode_selected():
+            return False
+        if self.shop_mode_selected():
+            return bool(feature.COOP_FEATURE_ENABLED and self.coop_mode_var.get())
         return bool(feature.COOP_FEATURE_ENABLED and (
-            self.coop_mode_var.get() or self.state.get('coop_mode') or self.mixed_run_active()
+            self.coop_mode_var.get() or self.state.get('coop_mode') or self.adaptive_challenge_run_active()
             or self.progression_mode_var.get() in ('Grid Mode', 'Mission List')))
 
     def party_run_shareable(self):
+        if self.shop_mode_selected() or self.final_fortress_mode_selected():
+            return False
         return bool(self.state.get('seed') and (
-            self.state.get('coop_mode') or self.mixed_run_active()))
+            self.state.get('coop_mode') or self.adaptive_challenge_run_active()))
 
     def refresh_party_summary(self):
         variable = getattr(self, 'party_launch_summary_var', None)
@@ -53,10 +59,21 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
         mission = self.selected_mission()
         lobby = getattr(self, '_coop_lobby', None)
         connected = bool(lobby and lobby.connected)
+        if self.shop_mode_selected():
+            text = ('Shop run · Two humans play the selected co-op mission offer.'
+                    if self.coop_mode_var.get() else
+                    'Shop run · Play the selected campaign mission offer solo.')
+            if connected:
+                text += f'\nParty: {lobby.peer} connected. The host selects each mission.'
+            variable.set(text)
+            return
         if not mission:
             text = 'Select a mission to see its player setup.'
         elif self.challenge_mission():
-            partner = self.selected_challenge_partner()
+            partner = (self.selected_challenge_partner() if self.adaptive_challenge_run_active() else
+                       'Friend' if self.state.get('coop_mode') else
+                       'AI teammate' if (self.challenge_ai_selected()
+                                        or self.automatic_challenge_helper(mission)) else 'Solo')
             text = ('Challenge · ' + ('Host chooses participants' if self.coop_guest_connected() else partner)
                     + '. Choose houses and different colors before launch.')
             if mission.get('requires_teammate'):
@@ -79,7 +96,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
         if not hasattr(self, 'coop_connection_button'):
             return
         available = feature.COOP_FEATURE_ENABLED
-        shop = self.shop_mode_selected()
+        shop = self.shop_mode_selected() and not self.final_fortress_mode_selected()
         self.coop_controls_frame.grid_remove() if shop else self.coop_controls_frame.grid()
         self.shop_coop_row.grid() if shop else self.shop_coop_row.grid_remove()
         category = self.selected_mission_category()
@@ -88,15 +105,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
         team_mission = bool(mission and mission.get('coop_name'))
         enabled = self.party_connection_available()
         guest = self.coop_guest_connected()
-        self.campaign_combo.configure(values=(
-            ('All Campaigns', 'Allies', 'Soviets', 'Epsilon') if category == 'coop' else
-            ('All Campaigns', 'Allies', 'Soviets', 'Epsilon', 'Foehn')
-        ))
-        if category == 'coop' and self.campaign_var.get() == 'Foehn':
-            self.campaign_var.set('All Campaigns')
-        self.rewards_per_check_label.configure(
-            text='Rewards per mission' if team_mission else 'Rewards per objective'
-        )
+        self.rewards_per_check_label.configure(text='Rewards per check')
         for button in (self.coop_connection_button, self.shop_coop_connection_button):
             button.configure(state='normal' if available else 'disabled')
             button.grid() if enabled else button.grid_remove()
@@ -113,17 +122,16 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
             widget = getattr(self, name, None)
             if widget is not None:
                 widget.configure(state='disabled' if locked else 'readonly')
-        for widget in (self.coop_mode_check, self.shop_coop_mode_check):
-            widget.configure(state='disabled' if locked or not available else 'normal')
-            if category == 'mixed':
-                widget.grid_remove()
-            else:
-                widget.grid()
+        self.coop_mode_check.configure(state='disabled')
+        self.coop_mode_check.grid_remove()
+        # Shop's category switch belongs to its pool setup, not the Party
+        # panel. Its container decides visibility; do not re-grid it here.
+        self.shop_coop_mode_check.configure(state='disabled' if locked or not available else 'normal')
         for widget in (self.coop_player_count_combo, self.shop_coop_player_count_combo):
             widget.configure(state='disabled' if locked or active_shop else 'readonly')
         for prefix in ('', 'shop_'):
             for widget in getattr(self, prefix + 'challenge_fields', ()):
-                widget.grid() if category == 'challenge' and self.challenges_available() else widget.grid_remove()
+                widget.grid_remove()
             country = getattr(self, prefix + 'challenge_country_combo', None)
             if country is not None:
                 country.configure(state='disabled' if locked else 'readonly')
@@ -143,18 +151,20 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
         if challenge:
             self.difficulty_combo.configure(state='disabled' if guest or active_game
                                             or getattr(self, '_coop_busy', False) else 'readonly')
+        refresh = getattr(self, 'refresh_setup_flow', None)
+        if callable(refresh):
+            refresh()
 
     def active_mission_exclusions(self):
-        if (hasattr(self, 'mission_pool_selection')
-                and self.progression_mode_var.get() in ('Grid Mode', 'Mission List')
-                and not self.archipelago_run_active()):
+        category = getattr(self, 'selected_setup_category', self.selected_mission_category)()
+        if category == 'mixed':
             return MissionExclusions(
                 self.excluded_mission_codes, self.excluded_challenge_mission_codes,
                 coop=self.excluded_coop_mission_codes,
             )
-        if self.selected_mission_category() == 'challenge':
+        if category == 'challenge':
             return self.excluded_challenge_mission_codes
-        base = (self.excluded_coop_mission_codes if self.coop_mode_var.get()
+        base = (self.excluded_coop_mission_codes if category == 'coop'
                 else self.excluded_mission_codes)
         return MissionExclusions(base, self.excluded_challenge_mission_codes)
 
@@ -266,7 +276,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                 messagebox.showwarning('Co-op', 'Start a Shop run from the co-op map pool.')
                 return
         elif role == 'host' and not self.party_run_shareable():
-            messagebox.showwarning('Party', 'Generate or load a mixed or co-op run before hosting.')
+            messagebox.showwarning('Party', 'Generate or load a mixed, challenge, or co-op run before hosting.')
             return
         try:
             pairing_code = pairing_code.strip()
@@ -300,7 +310,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                      'progression_mode_var', 'mission_goal_var', 'rewards_per_check_var',
                      'selected_index', 'mission_category_var', 'challenge_player_count_var',
                      'challenge_country_var', 'coop_mode_var', 'game_speed_var',
-                     'include_challenge_missions_var', 'challenge_partner_var')
+                     'include_challenge_missions_var', 'challenge_partner_var', 'setup_category_var')
             self._coop_local_snapshot = (copy.deepcopy(self.state), {
                 key: getattr(self, key).get() for key in names if hasattr(self, key)
             })
@@ -463,7 +473,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
 
     def _publish_party_activity(self):
         lobby = getattr(self, '_coop_lobby', None)
-        if not (self.mixed_run_active() and lobby and lobby.connected and lobby.role == 'host'):
+        if not (self.adaptive_challenge_run_active() and lobby and lobby.connected and lobby.role == 'host'):
             return
         process = getattr(self, 'active_game_process', None)
         solo = bool(not getattr(self, '_coop_busy', False) and (
@@ -488,7 +498,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
     def _append_unavailable_host_missions(self, state, codes):
         summaries = state.get('party_mission_summaries')
         if not isinstance(summaries, dict):
-            raise ValueError('Host omitted the mixed run mission catalogue.')
+            raise ValueError('Host omitted the shared run mission catalogue.')
         for code in codes:
             if code in self._mission_by_code:
                 continue
@@ -546,7 +556,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
             return
         try:
             shared = shared_run_state(self.state, getattr(self, '_archipelago_slot_data', None))
-            if self.mixed_run_active():
+            if self.adaptive_challenge_run_active():
                 shared['party_mission_summaries'] = self._shared_mission_summaries()
             lobby.send({'type': 'state', 'data': encode_state(shared)})
             self.coop_broadcast_selection()
@@ -593,7 +603,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
             return
         if lobby.role == 'guest':
             if kind == 'party_status':
-                if (not self.mixed_run_active() or message.get('run_id') != self.state.get('run_id')
+                if (not self.adaptive_challenge_run_active() or message.get('run_id') != self.state.get('run_id')
                         or message.get('phase') not in {'solo', 'ready'}):
                     raise ValueError('Party activity belongs to a different run.')
                 self._set_coop_status(
@@ -618,7 +628,8 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                         or (state.get('archipelago') or {}).get('enabled')):
                     raise ValueError('Host sent unsupported mixed run settings.')
                 if category == 'challenge' and (
-                        state.get('challenge_player_count') != 2
+                        type(state.get('challenge_player_count')) is not int
+                        or state.get('challenge_player_count') not in (1, 2)
                         or state.get('progression_mode') == 'Shop Mode'
                         or (state.get('archipelago') or {}).get('enabled')):
                     raise ValueError('Host sent unsupported challenge run settings.')
@@ -627,7 +638,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                 ))
                 self.mission_category_var.set(category)
                 self.challenge_player_count_var.set(str(state.get('challenge_player_count', 1)))
-                self.sync_mission_transport_mode()
+                self.sync_mission_transport_mode(category=category)
                 # Host owns the mission pool; each player's lobby house is local.
                 self.missions = self.load_missions()
                 self._mission_by_code = {mission['code']: mission for mission in self.missions}
@@ -637,12 +648,16 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                         or not all(isinstance(code, str) and re.fullmatch(r'[A-Z0-9_]{1,96}', code)
                                    for code in codes) or len(set(codes)) != len(codes)):
                     raise ValueError('Host sent an invalid mission order.')
-                if category == 'mixed':
+                if category in {'mixed', 'challenge'}:
                     self._append_unavailable_host_missions(state, codes)
-                    self.mission_pool_selection = normalize_pool_selection(state.get('mission_pool_selection'))
+                    if category == 'mixed':
+                        self.mission_pool_selection = normalize_pool_selection(state.get('mission_pool_selection'))
                 elif not all(code in available for code in codes):
                     raise ValueError('Host co-op maps differ from installed catalogue.')
                 self.state = state
+                setup_category = getattr(self, 'setup_category_var', None)
+                if setup_category is not None and category != 'mixed':
+                    setup_category.set({'coop': 'Co-op', 'challenge': 'Challenges'}.get(category, 'Campaign'))
                 ap = state.get('archipelago') or {}
                 self._archipelago_slot_data = copy.deepcopy(ap.get('slot_data') or {})
                 self._archipelago_location_groups = {}
@@ -699,7 +714,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
                 mission = self.mission_lookup().get(code)
                 if not mission or mission.get('unavailable_locally') or not mission.get('coop_name'):
                     raise ValueError('The selected team mission is not installed locally.')
-                if self.mixed_run_active() and message.get('run_id') != self.state.get('run_id'):
+                if self.adaptive_challenge_run_active() and message.get('run_id') != self.state.get('run_id'):
                     raise ValueError('Host launch belongs to a different run.')
                 if self.shop_mode_selected() and self.coop_mode_var.get():
                     run = self.shop_repository.load_run()
@@ -743,8 +758,8 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
 
     def _handle_party_prepare(self, lobby, message):
         """Check this one mission before either process begins preparing game files."""
-        if not self.mixed_run_active():
-            raise ValueError('Party launch readiness requires a mixed run.')
+        if not self.adaptive_challenge_run_active():
+            raise ValueError('Party launch readiness requires a mixed or challenge run.')
         if message['type'] == 'prepare_request':
             if lobby.role != 'guest':
                 raise ValueError('Only the host can request a team launch.')
@@ -809,7 +824,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
             self._record_coop_log('Result belongs to a different run; no victory awarded.', error=True)
             return False
         token = getattr(self, '_coop_active_game_token', '')
-        if self.mixed_run_active():
+        if self.adaptive_challenge_run_active():
             if not token or code != getattr(self, '_coop_active_game_code', None):
                 return False
             identity = f'{self.state.get("run_id")}:{code}:victory:{token}'
@@ -846,7 +861,7 @@ class CoopController(CoopShopController, ChallengeLobbyController, CoopConnectio
             return
         if lobby.role == 'guest':
             self.coop_selection_changed()
-        elif self.mixed_run_active():
+        elif self.adaptive_challenge_run_active():
             try:
                 choices = self.challenge_pair_options(mission) if self.challenge_mission() else None
                 pending = {'type': 'prepare_request', 'token': secrets.token_urlsafe(24),

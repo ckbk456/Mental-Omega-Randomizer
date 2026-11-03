@@ -43,23 +43,11 @@ class FortressCoopController(FortressCoopLaunchController):
             fields = getattr(self, prefix + 'fortress_player_count_fields', ())
             for field in fields:
                 field.grid() if fortress else field.grid_remove()
-            toggle = getattr(self, prefix + 'coop_mode_check', None)
+            toggle = getattr(self, prefix + 'fortress_coop_mode_check', None)
             if toggle is not None:
-                if getattr(toggle, '_fortress_settings_mode', None) != fortress:
-                    toggle.configure(
-                        variable=self.final_fortress_coop_var if fortress else self.coop_mode_var,
-                        command=self.on_fortress_coop_mode_changed if fortress else self.on_coop_checkbox_changed)
-                    toggle._fortress_settings_mode = fortress
-                if fortress:
-                    toggle.configure(state='disabled' if locked or not feature.COOP_FEATURE_ENABLED else 'normal')
-            tooltip = getattr(self, prefix + 'coop_mode_tooltip', None)
-            if tooltip is not None:
-                tooltip.text = ('Off: solo Fortress. On: two or three humans over ZeroTier.' if fortress
-                                else 'Off: solo campaign missions. On: two-player co-op missions.')
+                toggle.grid() if fortress else toggle.grid_remove()
+                toggle.configure(state='disabled' if locked or not feature.COOP_FEATURE_ENABLED else 'normal')
             include = getattr(self, prefix + 'include_challenge_missions_check', None)
-            if include is not None:
-                include.configure(variable=self._fortress_challenge_maps_var if fortress
-                                  else self.include_challenge_missions_var)
             speed = getattr(self, prefix + 'game_speed_combo', None)
             if speed is not None:
                 speed.master.grid_remove() if fortress else speed.master.grid()
@@ -74,7 +62,7 @@ class FortressCoopController(FortressCoopLaunchController):
                 include.grid_remove()
             for field in getattr(self, prefix + 'challenge_fields', ()):
                 field.grid_remove()
-            for suffix in ('challenge_local_frame', 'challenge_availability_label'):
+            for suffix in ('challenge_local_frame', 'challenge_availability_label', 'challenge_partner_row'):
                 widget = getattr(self, prefix + suffix, None)
                 if widget is not None:
                     widget.grid_remove()
@@ -88,7 +76,7 @@ class FortressCoopController(FortressCoopLaunchController):
                 button.grid() if enabled or sessions else button.grid_remove()
         frame = getattr(self, 'coop_controls_frame', None)
         if frame is not None:
-            frame.configure(text='Final Fortress co-op' if fortress else 'Party & mission setup')
+            frame.configure(text='Final Fortress party' if fortress else '4. Party & mission setup')
 
     def open_coop_dialog(self):
         if self.final_fortress_mode_selected():
@@ -226,8 +214,9 @@ class FortressCoopController(FortressCoopLaunchController):
                 'Waiting for host. Host perks shared; Fundraising uses your own enabled rank.')
         for widget in getattr(self, 'final_fortress_setup_combos', ()):
             widget.configure(state='disabled' if busy or guest else 'readonly')
-        if sessions:
-            self.final_fortress_setup_combos[0].configure(state='disabled')
+        mode = getattr(self, 'progression_mode_combo', None)
+        if mode is not None:
+            mode.configure(state='disabled' if sessions or busy else 'readonly')
         widget = getattr(self, 'final_fortress_mental_ai_boost_check', None)
         if widget is not None:
             widget.configure(state='disabled' if busy or guest else 'normal')

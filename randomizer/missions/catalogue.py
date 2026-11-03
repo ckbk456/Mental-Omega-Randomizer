@@ -127,8 +127,10 @@ def filter_missions_by_build_settings(
     include_true_no_build=True,
     include_no_build_production=True,
     include_operation_missions=True,
+    operation_exempt_codes=(),
 ):
-    """Apply independent no-build and optional-operation pool settings."""
+    """Apply build filters; explicit category selections can own their operations."""
+    operation_exemptions = {str(code).upper() for code in operation_exempt_codes}
     excluded = set()
     if not include_true_no_build:
         excluded.add(TRUE_NO_BUILD)
@@ -140,6 +142,7 @@ def filter_missions_by_build_settings(
         and (
             include_operation_missions
             or mission.get('code', '').upper() not in OPERATION_MISSION_CODES
+            or mission.get('code', '').upper() in operation_exemptions
         )
     ]
 

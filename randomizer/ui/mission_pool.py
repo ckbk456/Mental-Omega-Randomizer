@@ -86,7 +86,7 @@ class MissionPoolMatrix(ttk.Frame):
                 tooltip = WidgetTooltip(check, '')
                 self._cells[cell] = (selected, check, tooltip)
         ttk.Label(
-            self, text='APRA2 co-op is not included in the installed addon. '
+            self, text='ARPA2 campaign and Special Ops are single-player. '
             'Challenge colors describe the enemy faction.',
             style='Muted.TLabel', wraplength=600,
         ).grid(row=4, column=0, sticky='w', pady=(9, 12))
@@ -139,7 +139,7 @@ class MissionPoolMatrix(ttk.Frame):
             button.configure(state='normal' if self._enabled else 'disabled')
         total = sum(count for cell, count in self.counts.items() if cell in selected)
         coop = sum(count for cell, count in self.counts.items()
-                   if cell in selected and cell.split(':')[0] in ('mo_coop', 'apra2_coop'))
+                   if cell in selected and cell.split(':')[0] == 'mo_coop')
         self.summary.configure(text=f'{total} installed missions selected  ·  '
                                f'{total - coop} solo / AI capable  ·  {coop} human co-op')
         self.note.configure(text=(
@@ -147,7 +147,8 @@ class MissionPoolMatrix(ttk.Frame):
             if policy == 'required' else
             'Your mission goal follows a solo-capable path. Human co-op missions are optional '
             'bonus branches; challenges can use an AI helper.'
-        ) + '\nChanges apply to the next run. Individual exclusions remain in Advanced Pool.')
+        ) + '\nChanges apply to the next run. Build-type and MO operations filters below '
+            'also apply. Individual exclusions remain in Advanced Pool.')
         self._updating = False
 
     def set_enabled(self, enabled):
@@ -170,6 +171,7 @@ class MissionPoolMatrix(ttk.Frame):
         if not self._enabled or self._updating:
             return
         updated = {
+            'version': self.selection['version'],
             'cells': list(cells if cells is not None else self.selection['cells']),
             'cooperative_policy': policy or self.selection['cooperative_policy'],
         }
@@ -191,9 +193,9 @@ class MissionPoolMatrix(ttk.Frame):
 
     def _apply_preset(self, preset):
         rows = {
-            'campaign': {'mo_campaign', 'apra2_campaign'},
-            'coop': {'mo_coop', 'apra2_coop', 'challenges'},
-            'solo': {'mo_campaign', 'apra2_campaign', 'challenges'},
+            'campaign': {'mo_campaign', 'apra2_campaign', 'apra2_special_ops'},
+            'coop': {'mo_coop', 'challenges'},
+            'solo': {'mo_campaign', 'apra2_campaign', 'apra2_special_ops', 'challenges'},
             'all': {row for row, _ in POOL_ROWS}, 'clear': set(),
         }[preset]
         self._commit({cell for cell, count in self.counts.items()

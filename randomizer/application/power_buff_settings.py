@@ -22,7 +22,7 @@ class PowerBuffSettingsController:
 
     def power_buff_entries(self, include_excluded=False):
         entries = []
-        selected_campaign = self.campaign_var.get()
+        selected_campaign = self.effective_setup_campaign()
         arsenal_mode = self.reward_mode_var.get() == ARSENAL_MODE
         arsenal_factions = {
             faction for faction, variable in self.arsenal_faction_vars.items()

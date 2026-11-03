@@ -8,7 +8,7 @@ from randomizer.coop.lobby import LOBBY_PORT, Lobby
 
 class FortressLobby(Lobby):
     # Every guest must advertise its personal Fundraising rank before launch.
-    protocol = 'fortress-auto-2'
+    protocol = 'fortress-auto-3'
 
 
 class FortressHost:

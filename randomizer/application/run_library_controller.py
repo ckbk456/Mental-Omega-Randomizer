@@ -7,7 +7,9 @@ import tkinter as tk
 from randomizer.config.player import save_config
 from randomizer.core.paths import APP_DIR
 from randomizer.core.run_library import RunLibrary
-from randomizer.missions.unified import legacy_pool_selection, normalize_pool_selection
+from randomizer.missions.unified import (
+    APRA2_OPERATION_CODES, legacy_pool_selection, normalize_pool_selection, pool_selection_from_settings,
+)
 
 
 class RunLibraryController:
@@ -18,7 +20,8 @@ class RunLibraryController:
 
         def reveal():
             self.update_idletasks()
-            target = self.shop_coop_row if self.shop_mode_selected() else self.coop_controls_frame
+            target = (self.shop_coop_row if self.shop_mode_selected()
+                      and not self.final_fortress_mode_selected() else self.coop_controls_frame)
             offset = target.winfo_rooty() - self.settings_frame.winfo_rooty()
             height = max(1, self.settings_frame.winfo_height())
             self.settings_canvas.yview_moveto(max(0, (offset - 12) / height))
@@ -27,13 +30,24 @@ class RunLibraryController:
         self.after(120, reveal)
 
     def initialize_mission_pool_selection(self):
+        category_labels = {'campaign': 'Campaign', 'coop': 'Co-op', 'challenge': 'Challenges'}
+        label = self.config.get('setup_mission_category') or category_labels.get(self.selected_mission_category(), 'Campaign')
+        if label not in category_labels.values():
+            label = 'Campaign'
+        if hasattr(self, 'setup_category_var'):
+            self.setup_category_var.set(label)
+        else:
+            self.setup_category_var = tk.StringVar(master=self, value=label)
+        include_operations = bool(self.config.get('generation', {}).get('include_operation_missions', True))
         saved = self.config.get('mission_pool_selection')
         if saved is None:
             saved = legacy_pool_selection(
                 self.selected_mission_category(), self.campaign_var.get(),
                 self.optional_challenges_enabled(),
             )
-        self.mission_pool_selection = normalize_pool_selection(saved)
+            if not include_operations:
+                saved['cells'] = [cell for cell in saved['cells'] if not cell.startswith('apra2_special_ops:')]
+        self.mission_pool_selection = pool_selection_from_settings(saved, include_operations=include_operations)
 
     def on_unified_pool_changed(self, selection):
         if self.coop_guest_connected() or self.gameplay_settings_locked():
@@ -58,6 +72,9 @@ class RunLibraryController:
         process = getattr(self, 'active_game_process', None)
         return bool(
             getattr(self, '_coop_lobby', None)
+            or getattr(self, '_fortress_lobbies', None)
+            or getattr(self, '_final_fortress_preparing', False)
+            or getattr(self, '_final_fortress_watch', None)
             or self.gameplay_settings_locked()
             or getattr(self, '_coop_busy', False)
             or getattr(self, '_challenge_preparing', False)
@@ -94,13 +111,24 @@ class RunLibraryController:
         ):
             if key in incoming:
                 getattr(self, attr).set(incoming[key])
-        self.mission_pool_selection = normalize_pool_selection(
-            incoming.get('mission_pool_selection') or legacy_pool_selection(
+        self.setup_category_var.set({'campaign': 'Campaign', 'coop': 'Co-op',
+                                     'challenge': 'Challenges'}.get(category, 'Campaign'))
+        self.config['setup_mission_category'] = self.setup_category_var.get()
+        include_operations = incoming.get('mission_pool_settings', {}).get('include_operation_missions', True)
+        selection = incoming.get('mission_pool_selection')
+        if selection is None:
+            selection = legacy_pool_selection(
                 category, incoming.get('campaign_filter', 'All Campaigns'),
-                incoming.get('mission_pool_settings', {}).get('include_challenge_missions', False),
-            )
-        )
+                incoming.get('mission_pool_settings', {}).get('include_challenge_missions', False))
+            if not include_operations:
+                selection['cells'] = [cell for cell in selection['cells'] if not cell.startswith('apra2_special_ops:')]
+        self.mission_pool_selection = pool_selection_from_settings(
+            selection, include_operations=include_operations)
         self.config['mission_pool_selection'] = copy.deepcopy(self.mission_pool_selection)
+        # Programmatic resume must use the same canonical workspace switch as
+        # the mode selector. Fortress deliberately ignores progression traces.
+        self.game_mode_var.set(self.progression_mode_var.get())
+        self.on_game_mode_changed()
         save_config(self.config)
         self.migrate_state()
         self.grid_render_signature = None

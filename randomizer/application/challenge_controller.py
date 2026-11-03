@@ -22,7 +22,15 @@ from randomizer.missions.pool import is_challenge, select_mission_pool
 class ChallengeController:
     def mixed_run_active(self):
         return (self.state.get('mission_category') == 'mixed'
-                and self.progression_mode_var.get() not in ('Shop Mode', 'Final Fortress'))
+                and not self.shop_mode_selected()
+                and not self.final_fortress_mode_selected())
+
+    def adaptive_challenge_run_active(self):
+        """Player composition belongs to launch setup, including old challenge saves."""
+        return (self.state.get('mission_category') in {'mixed', 'challenge'}
+                and not self.shop_mode_selected()
+                and not self.final_fortress_mode_selected()
+                and not self.archipelago_run_active())
 
     def selected_challenge_partner(self):
         variable = getattr(self, 'challenge_partner_var', None)
@@ -38,7 +46,7 @@ class ChallengeController:
         self.refresh_coop_controls()
 
     def challenge_ai_selected(self):
-        if self.mixed_run_active():
+        if self.adaptive_challenge_run_active():
             return self.selected_challenge_partner() == 'AI teammate'
         return bool(self.challenge_ai_enabled_var.get())
 
@@ -66,11 +74,15 @@ class ChallengeController:
         return is_challenge(mission)
 
     def mission_pool_candidates(self, *, apply_exclusions=True):
-        mixed_pool = bool(hasattr(self, 'mission_pool_selection')
-                          and self.progression_mode_var.get() in ('Grid Mode', 'Mission List')
-                          and not self.archipelago_run_active())
+        if self.archipelago_run_active():
+            # The server's frozen slot owns inclusion; next-run controls do not.
+            lookup = self.mission_lookup()
+            return [lookup[code] for code in self.state.get('mission_order', ())
+                    if code in lookup]
+        setup_category = getattr(self, 'selected_setup_category', self.selected_mission_category)()
+        mixed_pool = setup_category == 'mixed' and hasattr(self, 'mission_pool_selection')
         return select_mission_pool(
-            self.missions, category='mixed' if mixed_pool else self.selected_mission_category(),
+            self.missions, category='mixed' if mixed_pool else setup_category,
             campaign=self.campaign_var.get(),
             include_challenges=self.optional_challenges_enabled(),
             excluded_codes=self.active_mission_exclusions() if apply_exclusions else (),
@@ -107,13 +119,18 @@ class ChallengeController:
         return snapshot[1] == self.capture_challenge_run_identity()[1]
 
     def selected_mission_category(self):
+        """The displayed run's category; next-run setup has its own selector."""
         variable = getattr(self, 'mission_category_var', None)
         category = variable.get() if variable is not None else self.config.get('mission_category')
         mode = getattr(self, 'progression_mode_var', None)
-        if category == 'mixed' and mode is not None and mode.get() == 'Shop Mode':
+        if mode is not None and mode.get() == 'Shop Mode':
             # Shop keeps its separate native pool, save and economy. Merely
             # opening that setup must not replace the archived mixed run.
             return 'coop' if self.coop_mode_var.get() else 'campaign'
+        if self.state:
+            category = self.state.get('mission_category') or (
+                'coop' if self.state.get('coop_mode') else 'campaign'
+            )
         if category in {'campaign', 'coop', 'challenge', 'mixed'}:
             return category
         return 'coop' if self.config.get('coop_mode') else 'campaign'
@@ -131,8 +148,8 @@ class ChallengeController:
                     country.get() if country is not None else self.config.get('challenge_country')
                 ))
 
-    def sync_mission_transport_mode(self):
-        category = self.selected_mission_category()
+    def sync_mission_transport_mode(self, *, category=None):
+        category = category or self.selected_mission_category()
         multiplayer = category == 'coop' or (
             category == 'challenge' and self.selected_challenge_player_count() == 2
         )
@@ -170,7 +187,7 @@ class ChallengeController:
         return bool(self.challenge_launch_active() or self.gameplay_settings_locked()
                     or getattr(self, '_coop_busy', False)
                     or self.coop_guest_connected()
-                    or (getattr(self, '_coop_lobby', None) and not self.mixed_run_active()))
+                    or (getattr(self, '_coop_lobby', None) and not self.adaptive_challenge_run_active()))
 
     def on_challenge_ai_house_selected(self, event=None):
         selected = self.challenge_ai_country_label_var.get()
@@ -199,9 +216,9 @@ class ChallengeController:
     def refresh_challenge_local_controls(self):
         local = (self.challenges_available() and not self.coop_mode_var.get()
                  and any(is_challenge(mission) for mission in getattr(self, 'missions', ())))
-        mixed = self.mixed_run_active() or (not self.state and self.selected_mission_category() == 'mixed')
-        if mixed:
-            local = bool(local and self.challenge_mission()
+        adaptive = self.adaptive_challenge_run_active()
+        if adaptive:
+            local = bool(self.challenge_mission()
                          and self.selected_challenge_partner() != 'Friend'
                          and not self.coop_guest_connected())
         frames = [getattr(self, prefix + 'challenge_local_frame', None)
@@ -219,7 +236,7 @@ class ChallengeController:
         self.challenge_ai_country_label_var.set(COUNTRY_LABELS.get(country, country))
         country = self.challenge_country_var.get()
         self.challenge_country_label_var.set(COUNTRY_LABELS.get(country, country))
-        automatic = not mixed and self.selected_mission_category() != 'challenge'
+        automatic = not adaptive and self.selected_mission_category() != 'challenge'
         enabled = automatic or self.challenge_ai_selected()
         locked = self.challenge_local_options_locked()
         state = 'disabled' if locked else 'readonly'
@@ -233,9 +250,11 @@ class ChallengeController:
             getattr(self, prefix + 'challenge_country_combo').configure(
                 state=state, values=tuple(COUNTRY_LABELS.values()),
             )
+            getattr(self, prefix + 'challenge_country_combo').grid()
+            getattr(self, prefix + 'challenge_country_label').grid()
             toggle = getattr(self, prefix + 'challenge_ai_toggle')
             toggle.configure(state='disabled' if locked else 'normal')
-            toggle.grid_remove() if automatic or mixed else toggle.grid()
+            toggle.grid_remove() if automatic or adaptive else toggle.grid()
             for widget in getattr(self, prefix + 'challenge_ai_fields'):
                 widget.grid() if enabled else widget.grid_remove()
             combos = getattr(self, prefix + 'challenge_ai_combos')
@@ -324,8 +343,8 @@ class ChallengeController:
         return human_color, ai
 
     def on_coop_checkbox_changed(self):
-        """Map the simple co-op toggle to the existing saved mission pools."""
-        if self.shop_mode_selected() and self.state.get('mission_category') == 'mixed':
+        """Shop selects its own transport without replacing the displayed run."""
+        if self.shop_mode_selected():
             process = getattr(self, 'active_game_process', None)
             if (self.gameplay_settings_locked() or self.shop_launch_active()
                     or getattr(self, '_coop_lobby', None) or getattr(self, '_coop_busy', False)
@@ -339,8 +358,34 @@ class ChallengeController:
             self.refresh_shop_mode()
             self.refresh_coop_controls()
             return
-        self.mission_category_var.set('coop' if self.coop_mode_var.get() else 'campaign')
-        self.on_mission_category_changed()
+        # Legacy widgets remain as aliases for compatibility, but pool setup
+        # no longer changes the active run's transport or loads another save.
+        self.coop_mode_var.set(bool(self.state.get('coop_mode', False)))
+
+    def on_setup_category_changed(self, _event=None):
+        """Change the next Classic pool without loading or modifying a run."""
+        variable = getattr(self, 'setup_category_var', None)
+        if variable is None:
+            return
+        if self.coop_guest_connected() or self.gameplay_settings_locked():
+            variable.set(self.config.get('setup_mission_category', 'Campaign'))
+            return
+        category = {'co-op': 'coop', 'challenges': 'challenge'}.get(
+            str(variable.get()).casefold(), str(variable.get()).casefold())
+        if category not in {'campaign', 'coop', 'challenge'}:
+            variable.set(self.config.get('setup_mission_category', 'Campaign'))
+            return
+        self.config['setup_mission_category'] = {
+            'campaign': 'Campaign', 'coop': 'Co-op', 'challenge': 'Challenges',
+        }[category]
+        save_config(self.config)
+        refresh = getattr(self, 'refresh_setup_flow', None)
+        if callable(refresh):
+            refresh()
+        self.update_mission_goal_limit()
+        self.refresh_advanced_pool_views()
+        self.refresh_challenge_support_controls()
+        self.update_header_summary()
 
     def on_mission_category_changed(self, _event=None):
         if self.selected_mission_category() == 'coop' and not feature.COOP_FEATURE_ENABLED:
@@ -423,8 +468,9 @@ class ChallengeController:
 
     def refresh_challenge_support_controls(self):
         challenge = self.selected_mission_category() == 'challenge'
+        challenge_setup = getattr(self, 'selected_setup_category', self.selected_mission_category)() == 'challenge'
         mixed = self.selected_mission_category() == 'mixed'
-        mixed_party = self.mixed_run_active() or (not self.state and mixed)
+        adaptive_party = self.adaptive_challenge_run_active()
         label = getattr(self, 'challenge_country_label_var', None)
         if label is not None:
             country = self.challenge_country_var.get()
@@ -439,8 +485,7 @@ class ChallengeController:
             if mixed:
                 text = 'Choose participants for each challenge. House and color checks happen at launch.'
             if challenge:
-                text = ('Saved challenge-only run. Toggle Co-op to switch mission pools.\n'
-                        'Map house/color restrictions apply.')
+                text = 'Saved challenge run. Houses and colors can be changed before launching.'
             availability.set(text if available and self.challenges_available() else '')
         for prefix in ('', 'shop_'):
             if not available:
@@ -448,28 +493,19 @@ class ChallengeController:
                     field.grid_remove()
             label = getattr(self, prefix + 'challenge_availability_label', None)
             if label is not None:
-                label.grid() if available and self.challenges_available() else label.grid_remove()
-            widget = getattr(self, prefix + 'include_challenge_missions_check', None)
-            if widget is not None:
-                visible = available and not challenge and not mixed and not self.coop_guest_connected()
-                supported = visible and not self.gameplay_settings_locked()
-                widget.configure(
-                    text=f'Include challenge maps ({count} installed)',
-                    state='normal' if supported else 'disabled',
-                )
-                widget.grid() if visible else widget.grid_remove()
+                label.grid_remove()
         assistance = getattr(self, 'failure_assistance_check', None)
         if assistance is not None:
             assistance.configure(
-                state='disabled' if challenge or self.gameplay_settings_locked() else 'normal'
+                state='disabled' if challenge_setup or self.gameplay_settings_locked() else 'normal'
             )
         description = getattr(self, 'assistance_description_label', None)
         if description is not None:
-            description.grid_remove() if challenge else description.grid()
+            description.grid_remove() if challenge_setup else description.grid()
         if assistance is not None:
             assistance.configure(text=(
                 'Retry assistance is unavailable for challenges'
-                if challenge else 'Strengthen failed missions on retry'
+                if challenge_setup else 'Strengthen failed missions on retry'
             ))
         for prefix in ('', 'shop_'):
             for suffix in ('challenge_country_combo', 'challenge_country_label'):
@@ -478,7 +514,7 @@ class ChallengeController:
                     widget.grid() if self.challenges_available() and not self.coop_mode_var.get() else widget.grid_remove()
             row = getattr(self, prefix + 'challenge_partner_row', None)
             if row is not None:
-                row.grid() if mixed_party and self.challenge_mission() and not self.coop_guest_connected() else row.grid_remove()
+                row.grid() if adaptive_party and self.challenge_mission() and not self.coop_guest_connected() else row.grid_remove()
             combo = getattr(self, prefix + 'challenge_partner_combo', None)
             if combo is not None:
                 combo.configure(state='disabled' if self.challenge_local_options_locked() else 'readonly')
@@ -493,22 +529,21 @@ class ChallengeController:
             widget = getattr(self, name, None)
             if widget is not None and not self.gameplay_settings_locked():
                 widget.configure(state='disabled' if challenge or mixed else 'normal')
-        if challenge:
-            button = getattr(self, 'shop_setup_start_button', None)
-            if button is not None:
-                button.configure(state='disabled')
         self.refresh_challenge_local_controls()
+        refresh = getattr(self, 'refresh_setup_flow', None)
+        if callable(refresh):
+            refresh()
 
     def on_progression_mode_changed(self, event=None):
         if not (getattr(self, '_coop_lobby', None) or getattr(self, '_coop_busy', False)):
-            if self.state.get('mission_category') == 'mixed':
+            if self.state:
                 if self.shop_mode_selected():
                     if not getattr(self, '_shop_from_mixed', False):
                         self._shop_from_mixed = True
                         self.coop_mode_var.set(bool(self.config.get('shop_coop_mode', False)))
                         self.select_shop_repository()
                 elif self.__dict__.pop('_shop_from_mixed', False):
-                    self.coop_mode_var.set(False)
+                    self.coop_mode_var.set(bool(self.state.get('coop_mode', False)))
         if (self.selected_mission_category() == 'challenge'
                 and self.progression_mode_var.get() == 'Shop Mode'):
             self.progression_mode_var.set('Grid Mode')
@@ -534,17 +569,13 @@ class ChallengeController:
         return super().start_shop_run()
 
     def challenge_run_ready(self):
-        legacy = self.selected_mission_category() == 'challenge'
-        expected = ('challenge', self.selected_challenge_player_count())
-        active = (self.state.get('mission_category'), self.state.get('challenge_player_count', 1))
-        if not self.state or (legacy and active != expected):
+        if not self.state:
             messagebox.showwarning(
                 'Challenge Seed Required',
-                'Generate a seed including challenges for the selected player mode first.',
+                'Generate or resume a run that includes challenges first.',
             )
             return False
-        if (self.state.get('coop_mode', False) != self.coop_mode_var.get()
-                or self.selected_mission_code() not in self.state.get('mission_order', ())):
+        if self.selected_mission_code() not in self.state.get('mission_order', ()):
             messagebox.showwarning('Challenge Seed Required',
                                    'Select a challenge from the current generated mission pool.')
             return False
@@ -559,7 +590,7 @@ class ChallengeController:
         mission = self.selected_mission()
         if mission and mission.get('coop_name') and not is_challenge(mission):
             return self.request_coop_launch()
-        if self.mixed_run_active():
+        if self.adaptive_challenge_run_active():
             if mission is None:
                 return
             if self.coop_guest_connected():
@@ -577,7 +608,7 @@ class ChallengeController:
             return
         if not self.challenge_run_ready():
             return
-        if self.state.get('coop_mode'):
+        if self.state.get('coop_mode') and not self.adaptive_challenge_run_active():
             return self.request_coop_launch()
         mission = self.selected_mission()
         if mission is None:

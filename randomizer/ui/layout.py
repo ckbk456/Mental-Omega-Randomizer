@@ -311,37 +311,60 @@ def _build_right_panel(self, main_frame):
     self.settings_canvas_window = viewport.window
     settings_canvas.bind('<Configure>', self.on_settings_canvas_configure, add='+')
 
-    self.fortress_mode_settings_frame = ttk.Frame(settings_frame)
-    self.fortress_mode_settings_frame.columnconfigure(1, weight=1)
-    ttk.Label(self.fortress_mode_settings_frame, text='Game Mode').grid(
-        row=0, column=0, sticky='w', padx=(0, 8))
-    self.fortress_settings_mode_combo = ttk.Combobox(
-        self.fortress_mode_settings_frame, textvariable=self.game_mode_var,
-        values=self.game_mode_choices, state='readonly', width=20)
-    self.fortress_settings_mode_combo.grid(row=0, column=1, sticky='ew')
-    self.fortress_settings_mode_combo.bind('<<ComboboxSelected>>', self.on_game_mode_changed)
-    self.fortress_settings_mode_combo.bind('<MouseWheel>', self.on_settings_control_mousewheel)
+    self.setup_mode_frame = ttk.LabelFrame(settings_frame, text='1. Choose your modes', padding=14)
+    self.setup_mode_frame.columnconfigure(1, weight=1)
+    ttk.Label(self.setup_mode_frame, text='Reward mode').grid(
+        row=0, column=0, sticky='w', padx=(0, 16), pady=(0, 8))
+    self.reward_mode_combo = ttk.Combobox(
+        self.setup_mode_frame, textvariable=self.reward_mode_var,
+        values=REWARD_MODES, state='readonly', width=24)
+    self.reward_mode_combo.grid(row=0, column=1, sticky='ew', pady=(0, 8))
+    self.reward_mode_combo.bind('<<ComboboxSelected>>', self.on_reward_mode_changed, add='+')
+    self.setup_reward_policy_var = tk.StringVar(master=self)
+    self.setup_reward_policy_label = ttk.Label(
+        self.setup_mode_frame, textvariable=self.setup_reward_policy_var, style='Muted.TLabel')
+    self.setup_reward_policy_label.grid(row=0, column=1, sticky='w', pady=(0, 8))
+    self.setup_reward_policy_label.grid_remove()
+    ttk.Label(self.setup_mode_frame, text='Game mode').grid(
+        row=1, column=0, sticky='w', padx=(0, 16))
+    self.progression_mode_combo = ttk.Combobox(
+        self.setup_mode_frame, textvariable=self.game_mode_var,
+        values=self.game_mode_choices, state='readonly', width=24)
+    self.progression_mode_combo.grid(row=1, column=1, sticky='ew')
+    self.progression_mode_combo.bind('<<ComboboxSelected>>', self.on_game_mode_changed, add='+')
+    # Keep the controller API while there is only one actual mode selector.
+    self.shop_progression_mode_combo = self.progression_mode_combo
+    self.fortress_settings_mode_combo = self.progression_mode_combo
+    self.fortress_mode_settings_frame = self.setup_mode_frame
+    self.setup_mode_help_var = tk.StringVar(master=self, value=(
+        'Choose the rules first, then select a compatible mission pool below.'))
+    ttk.Label(self.setup_mode_frame, textvariable=self.setup_mode_help_var,
+              style='Muted.TLabel', wraplength=680).grid(
+                  row=2, column=0, columnspan=2, sticky='ew', pady=(10, 0))
 
     seed_settings_frame = ttk.LabelFrame(
         settings_frame,
-        text='Run setup',
+        text='3. Run rules',
         padding=(14, 14, 14, 14),
     )
     self.seed_settings_frame = seed_settings_frame
     seed_settings_frame.grid(row=0, column=0, sticky='ew')
     seed_settings_frame.columnconfigure(0, weight=1)
+    self.setup_actions_frame = ttk.LabelFrame(
+        settings_frame, text='Generate your run', padding=14)
+    self.setup_actions_frame.columnconfigure(0, weight=1)
 
     ttk.Label(
-        seed_settings_frame,
+        self.setup_actions_frame,
         text='Seed name (optional; blank generates a new seed)',
         font=('Segoe UI', 10, 'bold'),
     ).grid(row=0, column=0, sticky='w')
-    seed_row = ttk.Frame(seed_settings_frame)
+    seed_row = ttk.Frame(self.setup_actions_frame)
     seed_row.grid(row=1, column=0, sticky='ew', pady=(0, 6))
     seed_row.columnconfigure(0, weight=1)
     ttk.Entry(seed_row, textvariable=self.seed_var, width=20).grid(row=0, column=0, sticky='ew', padx=(0, 6))
     self.seed_action_button = ttk.Button(
-        seed_row,
+        self.setup_actions_frame,
         text=(
             'Start Shop Mode'
             if self.progression_mode_var.get() == 'Shop Mode'
@@ -350,9 +373,9 @@ def _build_right_panel(self, main_frame):
         command=self.on_new_seed,
         style='Primary.TButton',
     )
-    self.seed_action_button.grid(row=0, column=1, sticky='ew')
+    self.seed_action_button.grid(row=3, column=0, sticky='ew', pady=(12, 0))
     options_row = ttk.Frame(seed_settings_frame)
-    options_row.grid(row=2, column=0, sticky='ew', pady=(0, 6))
+    options_row.grid(row=0, column=0, sticky='ew', pady=(0, 6))
     options_row.columnconfigure(1, weight=1)
     self.mission_goal_label = ttk.Label(options_row, text='Missions to finish')
     self.mission_goal_label.grid(row=0, column=0, sticky='w', padx=(0, 8))
@@ -365,14 +388,27 @@ def _build_right_panel(self, main_frame):
     )
     self.mission_goal_spinbox.grid(row=0, column=1, sticky='w')
     mission_pool_frame = ttk.LabelFrame(
-        settings_frame, text='Mission pool', padding=(14, 14, 14, 14),
+        settings_frame, text='2. Mission pool', padding=(14, 14, 14, 14),
     )
     self.mission_pool_frame = mission_pool_frame
     mission_pool_frame.columnconfigure(1, weight=1)
-    self.campaign_label = ttk.Label(mission_pool_frame, text='Campaign filter')
+    self.legacy_mission_pool_frame = ttk.Frame(mission_pool_frame)
+    self.legacy_mission_pool_frame.columnconfigure(1, weight=1)
+    self.legacy_mission_pool_frame.grid(row=1, column=0, columnspan=2, sticky='ew', pady=(0, 12))
+    if not hasattr(self, 'setup_category_var'):
+        self.setup_category_var = tk.StringVar(master=self, value='Campaign')
+    ttk.Label(self.legacy_mission_pool_frame, text='Mission category').grid(
+        row=0, column=0, sticky='w', padx=(0, 8))
+    self.setup_category_combo = ttk.Combobox(
+        self.legacy_mission_pool_frame, textvariable=self.setup_category_var,
+        values=('Campaign', 'Co-op', 'Challenges'), state='readonly', width=20)
+    self.setup_category_combo.grid(row=0, column=1, sticky='ew')
+    self.setup_category_combo.bind('<<ComboboxSelected>>', self.on_setup_category_changed)
+    self.setup_category_combo.bind('<MouseWheel>', self.on_settings_control_mousewheel)
+    self.campaign_label = ttk.Label(self.legacy_mission_pool_frame, text='Campaign filter')
     self.campaign_label.grid(row=1, column=0, sticky='w', pady=(6, 0), padx=(0, 8))
     self.campaign_combo = ttk.Combobox(
-        mission_pool_frame,
+        self.legacy_mission_pool_frame,
         state='readonly',
         textvariable=self.campaign_var,
         values=CAMPAIGN_FILTERS,
@@ -380,13 +416,15 @@ def _build_right_panel(self, main_frame):
     )
     self.campaign_combo.grid(row=1, column=1, sticky='ew', pady=(6, 0))
     self.campaign_combo.bind('<<ComboboxSelected>>', self.on_campaign_filter_changed, add='+')
+    self.legacy_mission_type_frame = ttk.Frame(self.legacy_mission_pool_frame)
+    self.legacy_mission_type_frame.grid(row=2, column=0, columnspan=2, sticky='ew')
     build_unified_pool_controls(self, mission_pool_frame)
     if self.selected_mission_category() == 'mixed':
         self.campaign_label.grid_remove()
         self.campaign_combo.grid_remove()
 
-    settings_file_row = ttk.Frame(seed_settings_frame)
-    settings_file_row.grid(row=3, column=0, sticky='ew', pady=(2, 0))
+    settings_file_row = ttk.Frame(self.setup_actions_frame)
+    settings_file_row.grid(row=2, column=0, sticky='ew', pady=(2, 0))
     settings_file_row.columnconfigure(0, weight=1)
     settings_file_row.columnconfigure(1, weight=1)
     ttk.Button(
@@ -492,16 +530,6 @@ def _build_right_panel(self, main_frame):
     self.rewards_per_check_var.trace_add('write', self.refresh_rewards_per_check_message)
     self.refresh_rewards_per_check_message()
 
-    ttk.Label(options_row, text='Reward mode').grid(row=9, column=0, sticky='w', pady=(6, 0), padx=(0, 8))
-    self.reward_mode_combo = ttk.Combobox(
-        options_row,
-        state='readonly',
-        textvariable=self.reward_mode_var,
-        values=REWARD_MODES,
-        width=20,
-    )
-    self.reward_mode_combo.grid(row=9, column=1, sticky='ew', pady=(6, 0))
-    self.reward_mode_combo.bind('<<ComboboxSelected>>', self.on_reward_mode_changed, add='+')
     WidgetTooltip(
         self.reward_mode_combo,
         'Standard keeps exact unit access behind its matching faction production. '
@@ -512,16 +540,6 @@ def _build_right_panel(self, main_frame):
         'buffs only, target content present in that mission, and never permanently unlock units or powers.',
     )
 
-    ttk.Label(options_row, text='Game Mode').grid(row=10, column=0, sticky='w', pady=(6, 0), padx=(0, 8))
-    self.progression_mode_combo = ttk.Combobox(
-        options_row,
-        state='readonly',
-        textvariable=self.game_mode_var,
-        values=self.game_mode_choices,
-        width=12,
-    )
-    self.progression_mode_combo.grid(row=10, column=1, sticky='ew', pady=(6, 0))
-    self.progression_mode_combo.bind('<<ComboboxSelected>>', self.on_game_mode_changed, add='+')
     WidgetTooltip(
         self.progression_mode_combo,
         'Classic follows the installed campaign order and opens one mission at a time. '
@@ -586,27 +604,15 @@ def _build_right_panel(self, main_frame):
 
     shop_settings_frame = ttk.LabelFrame(
         settings_frame,
-        text='Shop Mode Setup',
+        text='2. Shop mission pool & run setup',
         padding=(12, 12, 12, 12),
     )
     self.shop_settings_frame = shop_settings_frame
     shop_settings_frame.columnconfigure(1, weight=1)
-    self.build_classic_shop_controls(shop_settings_frame)
-
-    ttk.Label(shop_settings_frame, text='Game Mode').grid(
-        row=0, column=0, sticky='w', padx=(0, 12)
-    )
-    self.shop_progression_mode_combo = ttk.Combobox(
-        shop_settings_frame,
-        state='readonly',
-        textvariable=self.game_mode_var,
-        values=self.game_mode_choices,
-        width=18,
-    )
-    self.shop_progression_mode_combo.grid(row=0, column=1, sticky='ew')
-    self.shop_progression_mode_combo.bind(
-        '<<ComboboxSelected>>', self.on_game_mode_changed, add='+'
-    )
+    self.shop_classic_pool_container = ttk.Frame(shop_settings_frame)
+    self.shop_classic_pool_container.columnconfigure(0, weight=1)
+    self.shop_classic_pool_container.grid(row=0, column=0, columnspan=2, sticky='ew')
+    self.build_classic_shop_controls(self.shop_classic_pool_container)
 
     ttk.Separator(shop_settings_frame, orient='horizontal').grid(
         row=3, column=0, columnspan=2, sticky='ew', pady=12
@@ -628,7 +634,7 @@ def _build_right_panel(self, main_frame):
 
     shop_run_options = (
         (
-            'Next run faction pool', 'shop_faction_pool_combo',
+            'Reward faction pool', 'shop_faction_pool_combo',
             self.shop_faction_pool_var, self.shop_faction_pool_options,
         ),
     )
@@ -651,37 +657,37 @@ def _build_right_panel(self, main_frame):
     self.shop_faction_pool_combo.bind(
         '<<ComboboxSelected>>', self.on_shop_faction_pool_changed, add='+'
     )
-    self.shop_progression_mode_combo.bind(
-        '<MouseWheel>', self.on_settings_control_mousewheel, add='+'
-    )
     shop_mission_filters = ttk.LabelFrame(
         shop_settings_frame, text='Mission Pool', padding=8
     )
     shop_mission_filters.grid(
-        row=8, column=0, columnspan=2, sticky='ew', pady=(8, 0)
+        row=1, column=0, columnspan=2, sticky='ew', pady=(8, 0)
     )
+    self.shop_mission_filters_frame = shop_mission_filters
+    self.shop_mission_type_frame = ttk.Frame(shop_mission_filters)
+    self.shop_mission_type_frame.grid(row=0, column=0, columnspan=2, sticky='ew')
     self.build_skirmish_pool_control(shop_mission_filters, row=3, shop=True)
     self.shop_include_no_build_missions_check = ttk.Checkbutton(
         shop_mission_filters,
         text='Include no-build missions',
         variable=self.include_no_build_missions_var,
     )
-    self.shop_include_no_build_missions_check.grid(row=0, column=0, sticky='w')
+    self.shop_include_no_build_missions_check.grid(row=1, column=0, sticky='w')
     self.shop_include_no_build_production_missions_check = ttk.Checkbutton(
         shop_mission_filters,
         text='Include no-build missions with production',
         variable=self.include_no_build_production_missions_var,
     )
     self.shop_include_no_build_production_missions_check.grid(
-        row=1, column=0, sticky='w', pady=(4, 0)
+        row=2, column=0, sticky='w', pady=(4, 0)
     )
     self.shop_buff_allied_helpers_check = ttk.Checkbutton(
-        shop_mission_filters,
+        shop_settings_frame,
         text='Share purchased buffs with allied helpers',
         variable=self.buff_allied_helpers_var,
     )
     self.shop_buff_allied_helpers_check.grid(
-        row=2, column=0, sticky='w', pady=(4, 0)
+        row=7, column=0, columnspan=2, sticky='w', pady=(4, 0)
     )
     WidgetTooltip(
         self.shop_include_no_build_missions_check,
@@ -837,7 +843,7 @@ def _build_right_panel(self, main_frame):
         self.shop_modifier_buttons.append(checkbutton)
         self.shop_modifier_button_by_id[modifier_id] = checkbutton
 
-    build_coop_controls(self, shop_settings_frame, 1, shop=True)
+    build_coop_controls(self, shop_settings_frame, 18, shop=True)
 
     self.shop_setup_start_button = ttk.Button(
         shop_settings_frame,

@@ -71,7 +71,7 @@ class CoopConnectionController:
         ttk.Label(frame, text=(
             'Keep one party while moving between solo and team missions. Use the same authorized '
             'private network (Tailscale or ZeroTier). Guest enters the host’s '
-            'private IPv4 and pairing code. Host loads a mixed or co-op run first; Shop players '
+            'private IPv4 and pairing code. Host loads a mixed, challenge or co-op run first; Shop players '
             'start separate runs with the same seed and stage. Ports are automatic.'
             ' Each challenge player chooses their own house and a different color here. '
             'Host controls game speed and difficulty.'
