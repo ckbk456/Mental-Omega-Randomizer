@@ -821,6 +821,7 @@ def _deploy_structure_sprites(aliases, target_dir, map_path):
     Native building art and its external occupancy cells remain untouched.
     """
     from randomizer.ui.cameos import extract_mix_files_sync
+    from randomizer.maps.structure_buildup import static_structure_buildup, shp_frame_count
     sections = all_section_value_maps(
         Path(map_path).read_text(encoding='utf-8', errors='ignore').splitlines()
     )
@@ -831,11 +832,20 @@ def _deploy_structure_sprites(aliases, target_dir, map_path):
         'NEWURBAN': 'N', 'DESERT': 'D', 'LUNAR': 'L',
     }.get(theater, 'T')
     requested = {}
+    buildups = {}
     # Keep files at the cache root so installed-archive signature invalidation
     # removes them along with the rules/cameo cache after a game update.
     cache = CAMEO_CACHE_DIR
     def cached(name):
         return cache / ('structure-sprite-' + name.lower())
+
+    def source_names(source, fields):
+        names = []
+        if str(fields.get('newtheater', 'yes')).lower() == 'yes' and len(source) > 2:
+            names.extend(source[0] + letter + source[2:] + '.shp'
+                         for letter in (theater_letter, 'G'))
+        names.append(source + '.shp')
+        return list(dict.fromkeys(names))
     for art_id, values in aliases.items():
         if art_id not in STRUCTURE_ART_TEMPLATES:
             continue
@@ -843,15 +853,14 @@ def _deploy_structure_sprites(aliases, target_dir, map_path):
         if 'foundation' not in fields or fields.get('tooverlay'):
             continue
         source = str(fields.get('image') or art_id).upper()
-        names = []
-        if str(fields.get('newtheater', 'yes')).lower() == 'yes' and len(source) > 2:
-            names.extend(source[0] + letter + source[2:] + '.shp'
-                         for letter in (theater_letter, 'G'))
-        names.append(source + '.shp')
-        requested[art_id] = list(dict.fromkeys(names))
+        requested[art_id] = source_names(source, fields)
+        buildup = str(fields.get('buildup') or '').strip().upper()
+        if buildup and buildup not in {'NONE', '<NONE>'}:
+            buildups[art_id] = source_names(buildup, fields)
     extract_mix_files_sync([
         (name, cached(name))
-        for name in sorted({name for names in requested.values() for name in names})
+        for name in sorted({name for names in (*requested.values(), *buildups.values())
+                            for name in names})
     ])
     deployed = []
     for art_id, names in requested.items():
@@ -861,12 +870,28 @@ def _deploy_structure_sprites(aliases, target_dir, map_path):
         target = Path(target_dir) / (art_id.lower() + '.shp')
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
+        # Sale eligibility requires a loaded construction SHP, independently of
+        # Unsellable=no. Resolve native theater names before disabling theater
+        # substitution on the private art; otherwise even existing MK files
+        # become missing (e.g. YAPSYBMK vs the installed YGPSYBMK).
+        native_buildup = next((cached(name) for name in buildups.get(art_id, ())
+                               if cached(name).is_file()), None)
+        buildup_data = (native_buildup.read_bytes() if native_buildup is not None
+                        else static_structure_buildup(source.read_bytes()))
+        shp_frame_count(buildup_data)
+        buildup_id = art_id + 'MK'
+        if len(buildup_id) > 24:
+            raise CustomAssetError(f'Private construction art ID is too long: {buildup_id}')
+        buildup_path = Path(target_dir) / (buildup_id.lower() + '.shp')
+        buildup_path.write_bytes(buildup_data)
         # Replace existing keys case-insensitively before writing the overlay.
         for key in list(aliases[art_id]):
-            if key.lower() in {'image', 'newtheater', 'theater'}:
+            if key.lower() in {'image', 'newtheater', 'theater', 'buildup',
+                               'demandloadbuildup', 'freebuildup'}:
                 aliases[art_id].pop(key)
-        aliases[art_id].update(Image=art_id, NewTheater='no', Theater='no')
-        deployed.append(target)
+        aliases[art_id].update(Image=art_id, NewTheater='no', Theater='no',
+                              Buildup=buildup_id, DemandLoadBuildup='no', FreeBuildup='no')
+        deployed.extend((target, buildup_path))
     return deployed
 
 

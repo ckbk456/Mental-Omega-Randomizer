@@ -22,8 +22,9 @@ from randomizer.coop.prototype import build_manifest, rebuild_from_manifest
 from randomizer.maps.assets import deploy_generated_unit_art
 from randomizer.maps.ini import all_section_value_maps_preserve
 from randomizer.rewards.definitions import REWARD_POOL
-from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS
+from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS, STRUCTURE_ART_TEMPLATES
 from randomizer.rewards.roster import randomizer_unit_roster
+from randomizer.maps.structure_buildup import shp_frame_count
 
 
 def main():
@@ -81,6 +82,7 @@ def main():
                     by_image.setdefault(image, []).append((key, lowered))
             missing = []
             locks = []
+            unsellable = []
             for source in sorted(PORTABLE_STRUCTURE_IDS):
                 image = str(templates[source].get('Image', '')).upper()
                 copies = by_image.get(image, [])
@@ -89,15 +91,30 @@ def main():
                 for key, fields in copies:
                     if fields.get('buildlimit') == '0' or int(fields.get('techlevel', '1')) < 0:
                         locks.append(key)
+                    if fields.get('unsellable', 'no').lower() not in {'no', 'false', '0'}:
+                        unsellable.append(key)
             art_path, aliases = deploy_generated_unit_art(
                 map_path, target_path=destination / 'artmo.ini',
             )
+            buildup_frames = {}
+            for art_id, values in aliases.items():
+                fields = {str(k).lower(): v for k, v in values.items()}
+                if (art_id not in STRUCTURE_ART_TEMPLATES or 'foundation' not in fields
+                        or fields.get('tooverlay')):
+                    continue
+                buildup = fields.get('buildup', '')
+                if not buildup:
+                    raise ValueError(f'{art_id} has no build/sell artwork.')
+                buildup_frames[art_id] = shp_frame_count(
+                    (destination / (buildup.lower() + '.shp')).read_bytes()
+                )
             entry = {'map': name, 'sha256': hashlib.sha256(data).hexdigest(),
                      'replay_matches': replay == data, 'missing_structures': missing,
                      'locked_structures': locks, 'art_aliases': len(aliases),
+                     'unsellable_structures': unsellable, 'buildup_frames': buildup_frames,
                      'sprite_files': len(list(destination.glob('*.shp')))}
             report['exports'].append(entry)
-            if missing or locks or replay != data:
+            if missing or locks or unsellable or replay != data:
                 report['failures'].append(entry)
             print(f'{name}: {len(PORTABLE_STRUCTURE_IDS)-len(missing)} structures, '
                   f'replay={replay == data}, locks={len(locks)}', flush=True)

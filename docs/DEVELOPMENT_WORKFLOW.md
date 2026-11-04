@@ -79,8 +79,11 @@ internal artifact, and using the same destination would make its copy step fail.
 Local 1.49.0 adds a real installed-map export command (no launcher/UI or mock):
 `python tools/export_structure_tryout.py --run <existing-run.json> --output <separate-directory>`.
 It reads the run, adds the 36 structure access rewards in memory, exports all 22
-installed challenges, checks manifest replay and stages required art. Use
-`--maps c_regenbogen c_heavyobject coop_slights` to select actual maps, and
+installed challenges, checks manifest replay and stages required art.
+The 1.49.1 report also checks sell flags and validates every private construction
+SHP's frame headers and payload bounds. Native overlay walls are excluded from
+that SHP requirement.
+Use `--maps c_regenbogen c_heavyobject coop_slights` to select actual maps, and
 `--lab-route` for an explicit lab-only loadout with ordinary caps. About 30 seconds
 for all challenges on this installation; moderate CPU, one command at a time.
 Outputs contain copied run metadata and remain ignored local evidence.

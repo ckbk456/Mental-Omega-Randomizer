@@ -1,9 +1,22 @@
-# Campaign and tech structure rewards — local 1.49.0
+# Campaign and tech structure rewards — local 1.49.1
 
 This build adds 36 access rewards: eight campaign structures and 28 tech-building
 rewards, covering 40 physical building variants. Gladius and the Mental Omega
 Device are excluded. Construction prices, power and abilities follow the
 [reviewed balance table](docs/research/campaign-structure-rewards.md).
+
+**1.49.1 selling fix:** private buildings now have valid construction/sale artwork.
+Existing native buildups are resolved by theater and copied into private filenames;
+otherwise a static healthy frame and matching shadow are reused from the installed
+building sprite. No replacement artwork or engine extension is required. Walls
+retain their native overlay sale behavior. This corrects the missing-buildup
+restriction despite `Unsellable=no`; see the [engine sale restriction](https://github.com/Phobos-developers/Phobos/blob/develop/docs/New-or-Enhanced-Logics.md)
+and [Ares buildup loading](https://github.com/Ares-Developers/Ares/blob/master/src/Ext/BuildingType/Body.cpp).
+
+Restart the launcher and launch a mission afresh to apply this fix. **No new seed
+is needed.** Resuming an old in-game save retains its serialized building types.
+Both co-op players should use 1.49.1: a map art-revision marker prevents mixed
+versions from replaying the same launch with different sale behavior.
 
 ## Try the new buildings
 

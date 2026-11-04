@@ -9,6 +9,7 @@ from randomizer.maps.base import resolved_academy_clone_rules
 from randomizer.maps.ini import all_section_value_maps_preserve
 from randomizer.missions.access import _alternative_prerequisite_rules
 from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS
+from randomizer.maps.structure_buildup import STRUCTURE_ART_REVISION
 
 
 LAB_ID = 'CASLAB'
@@ -100,6 +101,11 @@ def portable_structure_reference_rules(
     updates = resolved_academy_clone_rules(
         owned_sections, clone_handled, owned_clone_ids,
     )
+    if owned_sections:
+        # Artwork now controls sale eligibility and construction timing. Bind
+        # its revision to replay-checked map bytes so older peers cannot launch
+        # the same map with incompatible building behavior.
+        updates['MORStructureAssets'] = {'Revision': str(STRUCTURE_ART_REVISION)}
 
     # Only the owned structures and their private provider powers participate.
     # A source TechnoType's inherited links must never broaden native AI powers.

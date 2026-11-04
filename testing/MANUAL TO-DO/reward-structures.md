@@ -55,3 +55,17 @@ lab-only exports, including ordinary/unlimited hospital limits and academy ship
 references. Original run files remain unchanged. These are generated-data checks,
 not completed live gameplay or two-PC QA. Use the shipped Structure-Tryout-1.49.json
 settings preset to generate a separate run with the 36 new access rewards.
+
+## 1.49.1 sale regression
+
+User reported new buildings could not be sold in 1.49.0. All 39 non-overlay
+building variants now stage valid private buildup SHPs (native animations where
+available; static body/shadow pairs otherwise), and keep `Unsellable=no`.
+Fresh generated-map/art reports cover payload bounds, construction references and
+manifest replay. These checks do not replace the user's live sell test.
+
+On a freshly launched mission, build and sell a campaign defense, tech income
+building, Secret Lab, Hospital and a concrete wall. Check the refund, cleared
+foundation, power/cap recovery, loss of lab-only Rejuvenator access, and release
+of controlled units. Compare native Beacon/Medic animations with the static
+fallbacks. Confirm both peers use 1.49.1 before testing synchronized sales.

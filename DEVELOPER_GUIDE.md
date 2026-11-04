@@ -14,6 +14,10 @@ stats instead of inheriting mission-objective overrides. `maps/reward_structures
 resolves lab prerequisites, academy lists, hospital caps and provider references
 after final clone IDs exist. `maps/assets.py` stages private building sprites and
 preloads private healing/EMP animations without changing installed native art.
+Since 1.49.1 it also stages native or body-derived construction SHPs: missing
+buildup artwork blocks selling even with `Unsellable=no`. The format helper lives
+in `maps/structure_buildup.py`; its revision is included in replay-checked map
+bytes to reject peers using the older sale behavior.
 
 ## Find the right file
 
