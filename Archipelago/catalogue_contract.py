@@ -59,6 +59,7 @@ BACKWARD_COMPATIBLE_CATALOGUE_CHECKSUMS = frozenset({
     "131222e5e1cf11379626f4adcb3e904a538a96dad94a2981e9c50fba2dd9905e",
     "50c9f05a972bd6ee585257fd27d43a7837dfbbfce37c59dc51925e28ed6768a1",
     "8d997872f75639fa975261cf1bdf7c2557b1282f024c73a4c8446395ab8c095f",
+    "aa75e68002afa3f963b396d0eca43335c97f15b0f483a8b38c9ed2ef0e3dddac",
 })
 
 
@@ -168,6 +169,20 @@ def build_snapshot(existing=None):
     projection = build_catalogue_projection()
     old_item_ids = _preserved_ids(existing or {}, "items")
     old_location_ids = _preserved_ids(existing or {}, "locations")
+    old_logic = {
+        entry["mission"]: entry
+        for entry in (existing or {}).get("local_victories", ())
+        if isinstance(entry, dict) and isinstance(entry.get("mission"), str)
+    }
+    # Installed add-ons can insert campaign missions before published co-op
+    # missions. Reserve every published local ID before assigning anything:
+    # projection order must never lend a co-op ID to a new campaign mission.
+    reserved_local_ids = {
+        int(entry[key])
+        for entry in old_logic.values()
+        for key in ("item_id", "location_id")
+        if entry.get(key) is not None
+    }
 
     used_item_ids = set(old_item_ids.values()) | set(PROTOTYPE_ITEM_IDS.values())
     next_item_id = max(used_item_ids, default=ITEM_ID_BASE - 1) + 1
@@ -180,7 +195,10 @@ def build_snapshot(existing=None):
         else:
             item_id = PROTOTYPE_ITEM_IDS.get(name, old_item_ids.get(name))
         if item_id is None:
-            while next_item_id in used_item_ids:
+            while (
+                next_item_id in used_item_ids
+                or next_item_id in reserved_local_ids
+            ):
                 next_item_id += 1
             item_id = next_item_id
             used_item_ids.add(item_id)
@@ -215,7 +233,10 @@ def build_snapshot(existing=None):
                     old_location_ids.get(name),
                 )
                 if location_id is None:
-                    while next_location_id in used_location_ids:
+                    while (
+                        next_location_id in used_location_ids
+                        or next_location_id in reserved_local_ids
+                    ):
                         next_location_id += 1
                     location_id = next_location_id
                     used_location_ids.add(location_id)
@@ -228,19 +249,31 @@ def build_snapshot(existing=None):
                     "slot": slot,
                 })
 
-    old_logic = {
-        entry["mission"]: entry
-        for entry in (existing or {}).get("local_victories", ())
-        if isinstance(entry, dict) and isinstance(entry.get("mission"), str)
-    }
+    next_local_id = max(
+        reserved_local_ids | {LOCAL_VICTORY_ID_BASE - 1}
+    ) + 1
     local_victories = []
-    for index, mission in enumerate(projection["missions"]):
+    for mission in projection["missions"]:
         code = mission["code"]
         title = mission["title"]
         previous = old_logic.get(code, {})
-        item_id = int(previous.get("item_id", LOCAL_VICTORY_ID_BASE + index))
+        default_id = None
+        if any(previous.get(key) is None for key in ("item_id", "location_id")):
+            while (
+                next_local_id in reserved_local_ids
+                or next_local_id in used_item_ids
+                or next_local_id in used_location_ids
+            ):
+                next_local_id += 1
+            default_id = next_local_id
+            next_local_id += 1
+        item_id = int(
+            previous["item_id"] if previous.get("item_id") is not None
+            else default_id
+        )
         location_id = int(
-            previous.get("location_id", LOCAL_VICTORY_ID_BASE + index)
+            previous["location_id"] if previous.get("location_id") is not None
+            else default_id
         )
         if item_id in used_item_ids or location_id in used_location_ids:
             raise ValueError(f"Local-victory ID collision for {code}.")
