@@ -1,20 +1,17 @@
 # Scoped roadmap
 
-Current behavior: [1.48.1 mixed-run and setup flow](../MIXED-RUNS.md).
-Historical notes remain in `TODOS.md`; they do not authorize new engine dependencies.
+Current behavior: [mixed runs and setup](../MIXED-RUNS.md) and
+[campaign/tech structure rewards](../STRUCTURE_REWARDS.md).
 
-| Work | Status | Next decision / gate |
+| Work | Status | Next gate |
 | --- | --- | --- |
-| Repository workflow, command registry and manual-QA ownership | Implemented locally on codex/campaign-structure-rewards | Lightweight validation; no publication requested |
-| Eight campaign structures | Revised proposal | Gladius and Mental Omega Device removed on 2026-11-04; no gameplay implementation yet |
-| Buildable tech-building access rewards | Research/proposal | User confirmed propose first; choose functional set, economy limits and power behavior |
-| Psychic Amplifier | Design selected | 32 reversible slots, $15,000, 900 power, range 18; implementation and gameplay verification pending |
-| Secret Lab | Distinct reward confirmed | Requires constructing the lab plus a War Factory; direct Rejuvenator Access requires no lab |
+| Repository workflow and QA ownership | Implemented locally | No publication requested |
+| Eight campaign structures | Implemented in local 1.49.0 | Live engine QA |
+| 28 tech-building access rewards / 32 physical variants | Implemented in local 1.49.0 | Placement, effects and two-PC QA |
+| Psychic Amplifier | 32 reversible slots, 15,000 credits, 900 power implemented | Live acquisition/release check |
+| Secret Lab | Separate lab-plus-factory route implemented | Construct/sell/rebuild and queue behavior |
 
-[The balance proposal](research/campaign-structure-rewards.md) owns proposed
-numbers and source evidence. After approval, implement in bounded changes:
-reward identity/templates first, isolated ability providers next, actual-map
-compatibility audits, then manual solo/AI/two-PC QA. Do not extend an old seed's
-reward schedule or change Archipelago IDs merely by adding catalogue entries.
-
-No release, merge, PR, engine upgrade or installed-game update is authorized here.
+The [research document](research/campaign-structure-rewards.md) retains the approved
+balance and source evidence. Existing frozen reward schedules and published IDs
+are preserved. User authorized implementation and a local build/install for testing
+on 2026-11-04. Publishing, PR, merge and release tagging remain unauthorized.

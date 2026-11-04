@@ -845,9 +845,10 @@ class UnlockDataController:
             })
 
         special_rewards = {
-            next(iter(tech_ids_for_rewards([reward])), ''): reward
+            unit_id: reward
             for reward in REWARD_POOL
             if reward.get('access_category') == 'special_building'
+            for unit_id in tech_ids_for_rewards([reward])
         }
         for definition in SPECIAL_BUILDING_DEFINITIONS:
             building_id = str(definition['id']).upper()

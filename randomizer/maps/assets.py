@@ -16,6 +16,7 @@ from randomizer.maps.ini import (
     all_section_value_maps_preserve,
 )
 from randomizer.rewards.definitions import UNIT_SIDEBAR_IMAGES
+from randomizer.rewards.structures import STRUCTURE_ART_TEMPLATES
 
 
 CUSTOM_ASSET_DIR = APP_DIR / 'assets'
@@ -722,6 +723,9 @@ def generated_unit_art_aliases(map_path, art_text, include_nanofiber=True):
         image_id = str(values.get('image') or '').strip().upper()
         if not image_id:
             continue
+        if image_id in STRUCTURE_ART_TEMPLATES:
+            aliases[image_id] = dict(STRUCTURE_ART_TEMPLATES[image_id])
+            continue
         name = str(values.get('name') or '').strip().lower()
         perun_used = perun_used or image_id == 'PERUN'
         configured_cameo = _configured_cameo_for_art_id(image_id)
@@ -765,6 +769,10 @@ def generated_unit_art_aliases(map_path, art_text, include_nanofiber=True):
                 'AltCameoPCX': alt_cameo or cameo,
             }
     from randomizer.maps.nanofiber import nanofiber_art_aliases
+    for animation in map_by_upper.get('ANIMATIONS', {}).values():
+        animation = str(animation).upper()
+        if animation in STRUCTURE_ART_TEMPLATES:
+            aliases[animation] = dict(STRUCTURE_ART_TEMPLATES[animation])
     if include_nanofiber and 'MORNANOFIBERANIMATIONS' in map_by_upper:
         mutation_art = _art_cameo_sections(art_text, preserve_keys=True)
         aliases.update(nanofiber_art_aliases(map_by_upper, mutation_art))
@@ -805,6 +813,63 @@ def generated_unit_art_aliases(map_path, art_text, include_nanofiber=True):
     return aliases
 
 
+def _deploy_structure_sprites(aliases, target_dir, map_path):
+    """Stage private building SHPs using the source building's map theater.
+
+    Building art Image redirects are not reliable across original engine types.
+    Resolve the installed filename once, then load a literal private filename.
+    Native building art and its external occupancy cells remain untouched.
+    """
+    from randomizer.ui.cameos import extract_mix_files_sync
+    sections = all_section_value_maps(
+        Path(map_path).read_text(encoding='utf-8', errors='ignore').splitlines()
+    )
+    map_values = next((v for k, v in sections.items() if k.lower() == 'map'), {})
+    theater = str(map_values.get('theater', 'TEMPERATE')).upper()
+    theater_letter = {
+        'TEMPERATE': 'T', 'SNOW': 'A', 'URBAN': 'U',
+        'NEWURBAN': 'N', 'DESERT': 'D', 'LUNAR': 'L',
+    }.get(theater, 'T')
+    requested = {}
+    # Keep files at the cache root so installed-archive signature invalidation
+    # removes them along with the rules/cameo cache after a game update.
+    cache = CAMEO_CACHE_DIR
+    def cached(name):
+        return cache / ('structure-sprite-' + name.lower())
+    for art_id, values in aliases.items():
+        if art_id not in STRUCTURE_ART_TEMPLATES:
+            continue
+        fields = {str(k).lower(): v for k, v in values.items()}
+        if 'foundation' not in fields or fields.get('tooverlay'):
+            continue
+        source = str(fields.get('image') or art_id).upper()
+        names = []
+        if str(fields.get('newtheater', 'yes')).lower() == 'yes' and len(source) > 2:
+            names.extend(source[0] + letter + source[2:] + '.shp'
+                         for letter in (theater_letter, 'G'))
+        names.append(source + '.shp')
+        requested[art_id] = list(dict.fromkeys(names))
+    extract_mix_files_sync([
+        (name, cached(name))
+        for name in sorted({name for names in requested.values() for name in names})
+    ])
+    deployed = []
+    for art_id, names in requested.items():
+        source = next((cached(name) for name in names if cached(name).is_file()), None)
+        if source is None:
+            raise CustomAssetError(f'Missing installed building sprite: {", ".join(names)}')
+        target = Path(target_dir) / (art_id.lower() + '.shp')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        # Replace existing keys case-insensitively before writing the overlay.
+        for key in list(aliases[art_id]):
+            if key.lower() in {'image', 'newtheater', 'theater'}:
+                aliases[art_id].pop(key)
+        aliases[art_id].update(Image=art_id, NewTheater='no', Theater='no')
+        deployed.append(target)
+    return deployed
+
+
 def _stage_mutation_preload_rules(
     aliases, target_dir, rules_cache_path=None, map_path=None,
 ):
@@ -818,6 +883,8 @@ def _stage_mutation_preload_rules(
     animations = [
         key for key, values in aliases.items()
         if 'MakeInfantry' in values
+        or (key in STRUCTURE_ART_TEMPLATES
+            and not any(str(field).lower() == 'foundation' for field in values))
         or (
             key.startswith('MOR')
             and 'Damage' in values
@@ -869,7 +936,10 @@ def _stage_mutation_preload_rules(
         for animation in animations:
             warhead = str(aliases[animation].get('Warhead') or '').strip()
             warhead_upper = warhead.upper()
-            if not warhead_upper.startswith('MOR'):
+            if not (warhead_upper.startswith('MOR')
+                    or animation in STRUCTURE_ART_TEMPLATES):
+                continue
+            if not warhead:
                 continue
             values = map_by_upper.get(warhead_upper)
             if not values:
@@ -953,6 +1023,7 @@ def deploy_generated_unit_art(
         RUNTIME_ASSET_DIR if staged else target.parent,
         art_text,
     )
+    unit_assets.extend(_deploy_structure_sprites(aliases, target.parent, map_path))
     mutation_assets = _stage_mutation_preload_rules(
         aliases, target.parent, rules_cache_path, map_path
     )

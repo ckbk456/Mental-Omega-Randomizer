@@ -172,6 +172,16 @@ REQUIRED_SECTIONS = {
     'rewards/special_buildings.json': {
         'buildings': list,
     },
+    'rewards/campaign_structures.json': {
+        'buildings': list, 'unit_base_stats': dict,
+        'unit_sidebar_images': dict, 'standalone_unit_rule_templates': dict,
+        'art_templates': dict,
+    },
+    'rewards/tech_structures.json': {
+        'buildings': list, 'unit_base_stats': dict,
+        'unit_sidebar_images': dict, 'standalone_unit_rule_templates': dict,
+        'art_templates': dict,
+    },
     'rewards/buff_exceptions.json': {
         'excluded_buff_type_ids': dict,
     },
@@ -740,6 +750,44 @@ def _validate_special_buildings(sections, path):
         ):
             _invalid(f'Invalid special building entry {index}', path)
         seen_ids.add(normalized_id)
+
+
+def _validate_portable_structures(sections, path):
+    """Validate authored reward packs independently of installed mission rules."""
+    _validate_special_buildings(sections, path)
+    declared = set()
+    for building in sections['buildings']:
+        ids = [building['id'], *building.get('linked_ids', ())]
+        for unit_id in ids:
+            if (not _is_nonempty_string(unit_id) or unit_id in declared
+                    or len('MORP' + unit_id) > 24):
+                _invalid(f'Invalid/duplicate portable structure {unit_id}', path)
+            declared.add(unit_id)
+        limit = building.get('build_limit')
+        if limit is not None and (type(limit) is not int or limit < 0):
+            _invalid(f'Invalid structure cap {building["id"]}', path)
+    if declared != set(sections['unit_base_stats']):
+        _invalid('Portable structure stats must cover exactly the reward variants', path)
+    for unit_id, stats in sections['unit_base_stats'].items():
+        if (not isinstance(stats, list) or len(stats) != 6
+                or any(not isinstance(stats[i], (int, float))
+                       or not isfinite(stats[i]) or stats[i] <= 0
+                       for i in (0, 2))):
+            _invalid(f'Invalid portable structure stats {unit_id}', path)
+    for unit_id, graph in sections['standalone_unit_rule_templates'].items():
+        if unit_id not in declared or not isinstance(graph, dict):
+            _invalid(f'Invalid portable structure dependency owner {unit_id}', path)
+        for registry, entries in graph.items():
+            if not _is_nonempty_string(registry) or not isinstance(entries, dict):
+                _invalid(f'Invalid portable structure registry {unit_id}', path)
+            for section, values in entries.items():
+                if (not _is_nonempty_string(section) or len(section) > 24
+                        or not isinstance(values, dict)):
+                    _invalid(f'Invalid portable dependency {section}', path)
+    for art_id, values in sections['art_templates'].items():
+        if (not _is_nonempty_string(art_id) or len(art_id) > 24
+                or not isinstance(values, dict) or not values):
+            _invalid(f'Invalid portable art {art_id}', path)
 
 
 def _validate_ui(sections, path):
@@ -1586,6 +1634,8 @@ CONFIG_VALIDATORS = {
     'rewards/unit_data.json': _validate_unit_data,
     'rewards/unit_policy.json': _validate_unit_policy,
     'rewards/special_buildings.json': _validate_special_buildings,
+    'rewards/campaign_structures.json': _validate_portable_structures,
+    'rewards/tech_structures.json': _validate_portable_structures,
     'ui.json': _validate_ui,
     'rewards/tuning.json': _validate_tuning,
     'tier_one.json': _validate_tier_one,

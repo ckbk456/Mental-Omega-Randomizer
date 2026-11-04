@@ -9,7 +9,7 @@ all configuration is grouped under `configs/`. Packaged runs create the same
 relative path under `RandomizerLauncherData/configs/player/`. Do not commit a
 personal player YAML.
 
-The six `Randomizer*.ini` files do not replace these documents. INI files are
+The eight `Randomizer*.ini` files do not replace these documents. INI files are
 complete player-owned TechnoType templates. JSON files define randomizer
 policy, reward identity/display, mission exceptions, cross-faction roles,
 stacking, compatibility aliases, and building-free power conversion. The main
@@ -20,6 +20,18 @@ role groups, linked identities, and special damage metadata. Remove or migrate
 that overlap only with full reward-plan and 97-map parity coverage.
 
 ## Files
+
+- `rewards/campaign_structures.json` and `rewards/tech_structures.json` define
+  the 36 portable structure access rewards, shared variants, reviewed stats,
+  private dependency graphs and private art. The matching
+  `RandomizerCampaignBuildings.ini` and `RandomizerTechBuildings.ini` own full
+  player templates. Native installed/mission stats deliberately do not overwrite
+  these redesigned types. An absent `BuildLimit` means unlimited; zero blocks
+  production and must not be used for an uncapped reward. New rewards use physical
+  alternatives for all four Construction Yards and remain available in Standard.
+  Hospital variants and bunker orientations each have one reward identity.
+  See [current mechanics](../STRUCTURE_REWARDS.md) before changing provider,
+  prerequisite, art occupancy or economic behavior.
 
 - `default_player_config.json`: fallback player, generation, launch, privacy,
   reward-weight, and future Archipelago settings used when active YAML keys are

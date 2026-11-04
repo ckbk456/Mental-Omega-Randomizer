@@ -1,6 +1,6 @@
 # Campaign and tech reward structures
 
-Status: **selected design decisions recorded on 2026-11-04; implementation and gameplay QA pending**. See the
+Status: **implemented in local 1.49.0 on 2026-11-04; live gameplay QA pending**. See the
 [research proposal](../../docs/research/campaign-structure-rewards.md).
 
 After an approved implementation, record version, installed engine, mission,
@@ -45,3 +45,13 @@ No live result is marked passed by this checklist's existence.
   ownership; already produced units remain intact.
 - With both rewards, losing the lab must not disable direct Rejuvenator Access.
   Check the separate reward identities and requirements on both human players.
+
+## Local preparation evidence
+
+Python 3.13.2 / MO 3.3.6 / Ares 20.333.289. All 22 installed challenge maps
+export with all 40 structure variants, staged art and identical manifest replay.
+Regenbogen, Heavyobject and Lights Out also have reviewed direct-Rejuvenator and
+lab-only exports, including ordinary/unlimited hospital limits and academy ship
+references. Original run files remain unchanged. These are generated-data checks,
+not completed live gameplay or two-PC QA. Use the shipped Structure-Tryout-1.49.json
+settings preset to generate a separate run with the 36 new access rewards.

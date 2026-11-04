@@ -21,6 +21,9 @@ from randomizer.rewards.roster import (
     randomizer_unit_ids_with_behavior,
     randomizer_unit_template_values,
 )
+from randomizer.rewards.structures import (
+    BUILDING_REWARD_DEFINITIONS, PORTABLE_STRUCTURE_IDS, structure_data,
+)
 
 
 _UNIT_DATA_CONFIG = load_static_config('rewards/unit_data.json')
@@ -31,7 +34,11 @@ _BUFF_EXCEPTION_CONFIG = load_static_config('rewards/buff_exceptions.json')
 _SPECIAL_BUILDING_CONFIG = load_static_config('rewards/special_buildings.json')
 SPECIAL_BUILDING_DEFINITIONS = tuple(
     dict(definition) for definition in _SPECIAL_BUILDING_CONFIG['buildings']
-)
+) + BUILDING_REWARD_DEFINITIONS
+for _field in (
+    'unit_sidebar_images', 'unit_base_stats', 'standalone_unit_rule_templates',
+):
+    _UNIT_DATA_CONFIG.setdefault(_field, {}).update(structure_data(_field))
 
 # This module is intentionally data-heavy. Keeping it separate from the Tk
 # launcher makes future Archipelago item/location work much easier.
@@ -71,7 +78,7 @@ FACTION_UNIT_ROSTERS['Allies']['units']['SHINBOT'] = 'Shin Tsurugi Decimator'
 SPECIAL_REWARD_UNIT_IDS = frozenset(
     str(unit_id).upper()
     for unit_id in _UNIT_DATA_CONFIG.get('special_reward_unit_ids', ())
-)
+) | PORTABLE_STRUCTURE_IDS
 UNIT_SIDEBAR_IMAGES = {
     str(unit_id).upper(): dict(config)
     for unit_id, config in _UNIT_DATA_CONFIG['unit_sidebar_images'].items()
@@ -488,19 +495,23 @@ def build_special_building_unlock_rewards():
         faction = str(definition['faction'])
         label = str(definition['name'])
         access = FACTION_ACCESS_RULES[faction]
+        universal = bool(definition.get('universal_access'))
         rules = build_unlock(
             building_id,
             definition.get('tech_level', 1),
-            str(definition['prerequisite']).upper(),
-            access['houses'],
+            (['GACNST', 'NACNST', 'YACNST', 'FACNST'] if universal
+             else str(definition['prerequisite']).upper()),
+            DEFAULT_UNLOCK_BUILD_HOUSES if universal else access['houses'],
         )
         build_limit = definition.get('build_limit')
-        if build_limit is not None:
+        if build_limit is not None and (not universal or build_limit > 0):
             rules[building_id]['BuildLimit'] = str(build_limit)
         if definition.get('build_category'):
             rules[building_id]['BuildCat'] = str(definition['build_category'])
         if definition.get('cameo_priority') is not None:
             rules[building_id]['CameoPriority'] = str(definition['cameo_priority'])
+        for linked_id in definition.get('linked_ids', ()):
+            rules[str(linked_id).upper()] = dict(rules[building_id])
         reward = {
             'name': f'{label} Access',
             'description': (
@@ -510,9 +521,15 @@ def build_special_building_unlock_rewards():
             'access_category': 'special_building',
             'special_reward': bool(definition.get('special_reward')),
             'rules': rules,
-            'factions': [faction],
+            'factions': [faction, 'Neutral'] if universal else [faction],
         }
-        if definition.get('granted_superweapon'):
+        if universal:
+            reward['access_unit'] = building_id
+            reward['description'] = (
+                f'Allows construction of the {label} from any faction '
+                'Construction Yard. ' + str(definition.get('description', ''))
+            ).strip()
+        if definition.get('granted_superweapon') and not universal:
             reward['building_superweapon'] = str(
                 definition['granted_superweapon']
             )
@@ -751,7 +768,8 @@ for building_id, capacity in _SPECIAL_BUILDING_CONFIG.get(
     ]
 
 for definition in SPECIAL_BUILDING_DEFINITIONS:
-    if not definition.get('capacity_rewards'):
+    portable = str(definition['id']).upper() in PORTABLE_STRUCTURE_IDS
+    if not definition.get('capacity_rewards') and not portable:
         continue
     building_id = str(definition['id']).upper()
     label = str(definition['name'])
@@ -759,9 +777,10 @@ for definition in SPECIAL_BUILDING_DEFINITIONS:
         'label': label,
         'plural': default_plural(label),
         'category': 'special_buildings',
-        'factions': [str(definition['faction'])],
-        'build_limit': int(definition.get('build_limit', 1)),
-        'building_limit': int(definition.get('build_limit', 1)),
+        'factions': [str(definition['faction']), 'Neutral'] if portable
+                    else [str(definition['faction'])],
+        'build_limit': int(definition.get('build_limit') or 0),
+        'building_limit': int(definition.get('build_limit') or 0),
         'capacity_stack_limit': int(definition.get('capacity_stack_limit', 4)),
         'build_category': str(definition.get('build_category', 'Tech')),
         'cameo_priority': int(definition.get('cameo_priority', -1000)),
@@ -770,6 +789,19 @@ for definition in SPECIAL_BUILDING_DEFINITIONS:
         'special_reward': bool(definition.get('special_reward')),
     }
     template = _RANDOMIZER_TEMPLATE_VALUES.get(building_id, {})
+    if portable:
+        stats = UNIT_BASE_STATS[building_id]
+        target.update({
+            'portable_structure': True,
+            'cost': stats[0], 'strength': stats[2],
+            'sight': stats[3], 'guard_range': stats[4],
+            'allowed_buff_types': ['production', 'cost', 'armor', 'health', 'sight'],
+            'trainable': str(next((v for k, v in template.items()
+                                  if k.lower() == 'trainable'), 'no')).lower() == 'yes',
+        })
+        if not definition.get('build_limit'):
+            target.pop('build_limit', None)
+            target.pop('building_limit', None)
     cash_amount = next((
         value for key, value in template.items()
         if str(key).lower() == 'producecashamount'
@@ -788,6 +820,14 @@ for definition in SPECIAL_BUILDING_DEFINITIONS:
         target['produce_cash_delay'] = cash_delay
         target['allowed_buff_types'].append('income')
     BUFF_TARGETS[building_id] = target
+    for linked_id in definition.get('linked_ids', ()):
+        linked_id = str(linked_id).upper()
+        linked = dict(target)
+        linked['linked_buff_source'] = building_id
+        BUFF_TARGETS[linked_id] = linked
+        # Physical variants stay in the static roster; they are not runtime
+        # deployment forms and do not receive separate reward identities.
+        LINKED_BUFF_VARIANTS.setdefault(building_id, {})[linked_id] = {}
 
 # High movement values break campaign pathfinding, formation spacing, landing,
 # and MCV deployment. Every mobile category therefore uses a direct

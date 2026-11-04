@@ -7,6 +7,14 @@ Start here when changing code. Player settings belong in
 [README_RANDOMIZER.md](README_RANDOMIZER.md); exact engine findings belong in
 [TECHNICAL_FINDINGS.md](TECHNICAL_FINDINGS.md).
 
+Portable campaign/tech rewards in local 1.49.0 are documented in
+[STRUCTURE_REWARDS.md](STRUCTURE_REWARDS.md). `rewards/structures.py` combines
+the two authored packs; roster overlays and map cloning preserve their reviewed
+stats instead of inheriting mission-objective overrides. `maps/reward_structures.py`
+resolves lab prerequisites, academy lists, hospital caps and provider references
+after final clone IDs exist. `maps/assets.py` stages private building sprites and
+preloads private healing/EMP animations without changing installed native art.
+
 ## Find the right file
 
 ### Seed and progression

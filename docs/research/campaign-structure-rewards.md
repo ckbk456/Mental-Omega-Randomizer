@@ -1,8 +1,9 @@
 # Campaign and tech structure reward proposal
 
-**Status: proposal revised — 2026-11-04.** The user explicitly chose to
-propose both sets before implementing them. No reward, unit, weapon, game asset,
-installed launcher or save was changed by this research.
+**Status: approved and implemented for local testing — 2026-11-04.** The user
+requested implementation after selecting the decisions below. This document
+retains the initial balance and research; current behavior and validation limits
+are in [STRUCTURE_REWARDS.md](../../STRUCTURE_REWARDS.md).
 
 Branch: `codex/campaign-structure-rewards`, from local 1.48.1 commit
 `30745f68e61a34db594d0a6656c4c4c24bf7dd44`. Repository workflow changes are separate
@@ -19,7 +20,7 @@ from this unimplemented balance design.
   player to construct the lab as well before its Rejuvenator production is available.
   The two access rewards must not be merged, aliased or treated as duplicates.
 
-These decisions revise the design; gameplay implementation has not started.
+These decisions are implemented in local 1.49.0; live gameplay verification remains pending.
 
 ## Reading the numbers
 
@@ -214,8 +215,9 @@ Losing or selling the lab removes only the lab-provided route to future producti
 It must not revoke separately earned direct Rejuvenator Access or delete units
 already produced. The lab grants a fixed Rejuvenator boon, with no capture/rebuild
 reroll. Preserve unrelated native capturable labs and their mission scripts.
-Construction-vs-capture activation and compact player-clone prerequisites remain
-implementation checks, not an unresolved product distinction.
+The implementation uses explicit owned-lab prerequisites rather than native secret
+boon logic. Generated maps verify both routes and compact references; live queue
+behavior remains a manual check.
 
 ### Native tech defenses and fortifications
 
@@ -295,16 +297,17 @@ specific installed version and can move after updates.
 | Retired Protector | `configs/rewards/catalogue.json`, `retired_reward_by_name` |
 | Academy reference plumbing | `randomizer/maps/base.py`, `resolved_academy_clone_rules` |
 
-## Remaining work before gameplay implementation
+## Implementation handoff
 
-The eight selected campaign candidates are Medic Bunker, Bust, Weather Crystal,
-Hybrid, Spectral, Beacon, Blackout and the 32-slot reversible Amplifier. The tech
-set retains Secret Lab as its own buildable reward. Gladius and Mental Omega
-Device are outside this feature's scope.
+The eight selected campaign structures and the complete reviewed functional tech
+set are implemented in local 1.49.0. Ordinary caps follow the existing unlimited-
+buildings option; there are no hidden economic exceptions. The Amplifier uses
+32 reversible slots, and Secret Lab remains independent of direct Rejuvenator
+Access. Gladius and Mental Omega Device are excluded.
 
-Remaining design decisions concern other balance values and which economic caps
-the unlimited-buildings option may lift. Implementation must verify native ability
-providers, finite controller capacity/release, Secret Lab construction prerequisites,
-artwork/foundations, actual-map compatibility and the manual QA checklist.
-The selected Amplifier behavior and Secret Lab reward distinction are settled.
-These decisions do not authorize publication, merging or an installed-game update.
+Static and generated-map audits verify portable definitions, provider references,
+lab prerequisites and art dependencies. Actual engine effects, placement,
+controller release and two-PC gameplay remain manual checks. See the current
+mechanics and tryout instructions in [STRUCTURE_REWARDS.md](../../STRUCTURE_REWARDS.md).
+The later explicit implementation request authorized a local test build/install;
+publication, PR, merge and release tagging remain unauthorized.

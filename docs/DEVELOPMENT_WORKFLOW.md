@@ -76,6 +76,19 @@ internal artifact, and using the same destination would make its copy step fail.
 
 ## Gates and delivery
 
+Local 1.49.0 adds a real installed-map export command (no launcher/UI or mock):
+`python tools/export_structure_tryout.py --run <existing-run.json> --output <separate-directory>`.
+It reads the run, adds the 36 structure access rewards in memory, exports all 22
+installed challenges, checks manifest replay and stages required art. Use
+`--maps c_regenbogen c_heavyobject coop_slights` to select actual maps, and
+`--lab-route` for an explicit lab-only loadout with ordinary caps. About 30 seconds
+for all challenges on this installation; moderate CPU, one command at a time.
+Outputs contain copied run metadata and remain ignored local evidence.
+
+The reviewed `presets/Structure-Tryout-1.49.json` uses the ordinary settings-import
+flow and grants all additions on a fresh generated run. It contains no personal
+profile or credentials. Manual gameplay remains a separate gate.
+
 Existing `security.yml` compiles and builds a complete Windows/APWorld bundle,
 then independently runs CodeQL and PR dependency review. `release-build.yml`
 checks source/tag agreement, builds and verifies payloads, and prepares a draft
@@ -118,8 +131,11 @@ All task-owned inspection/validation commands completed. No persistent process,
 server, migration, engine dependency, generated release or installed-game update
 was started. No external credential/provider permission is needed for this local
 handoff. Remote publication/merge/release authority remains **not granted**.
-Decision update 2026-11-04: the user selected the 32-slot reversible Amplifier,
-removed Gladius and Mental Omega Device, and retained Secret Lab as a distinct
-reward requiring lab construction before Rejuvenator production. Remaining work
-is other balance decisions, implementation of the selected prerequisites/abilities,
-and later manual QA; these resolved choices need no further confirmation.
+Implementation update 2026-11-04: the user subsequently requested implementation
+and a local playable build. Local 1.49.0 adds the selected 36 structure access
+rewards and a matching APWorld 0.6.11. All 22 challenge map exports replay identically;
+lab/direct access and provider references have additional real-map reviews.
+The old 4,450 item IDs, 43,857 location IDs and 133 local-victory pairs are retained.
+The installed ARPA2 catalogue adds 30 local-victory pairs after reserved IDs.
+Live gameplay, two-PC QA, pinned Python 3.14.6 packaging and remote CI remain separate
+gates. Source commits and local installation do not authorize publication or merging.

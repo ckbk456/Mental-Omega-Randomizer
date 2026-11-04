@@ -45,6 +45,9 @@ def _unit_tiers():
 
 def _root_access_unit(reward):
     tech_ids = sorted(tech_ids_for_rewards([reward]))
+    authored_root = str(reward.get('access_unit') or '').upper()
+    if authored_root in tech_ids and authored_root in BUFF_TARGETS:
+        return authored_root
     return next((unit_id for unit_id in tech_ids if unit_id in BUFF_TARGETS), '')
 
 

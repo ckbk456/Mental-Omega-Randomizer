@@ -19,6 +19,8 @@ ROSTER_FILENAMES = (
     'RandomizerShips.ini',
     'RandomizerAircraft.ini',
     'RandomizerDefensesAndSpecialBuildings.ini',
+    'RandomizerCampaignBuildings.ini',
+    'RandomizerTechBuildings.ini',
 )
 ROSTER_CATEGORIES = {
     'infantry': 'InfantryTypes',
@@ -522,6 +524,7 @@ def installed_rules_template_overlay(templates, installed_sections):
     mutates its input.
     """
     from randomizer.rewards.catalogue import BUFF_TARGETS, SPECIAL_REWARD_UNIT_IDS
+    from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS
     from randomizer.config.tuning import CLONE_UI_DESCRIPTION
     from randomizer.rewards.template_policy import (
         build_template_values,
@@ -536,6 +539,11 @@ def installed_rules_template_overlay(templates, installed_sections):
         return overlaid, report
 
     for source_id, template in sorted(templates.items()):
+        if source_id in PORTABLE_STRUCTURE_IDS:
+            # These are deliberately redesigned player rewards, not copies of
+            # a neutral objective's health, price, armor or mission abilities.
+            report['unchanged'].append(source_id)
+            continue
         source_name = case_insensitive_section(
             installed_sections, template_source_id(source_id)
         )

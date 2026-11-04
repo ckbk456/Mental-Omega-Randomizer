@@ -9,6 +9,7 @@ from randomizer.maps.clone_references import _target_with_effective_unit_stats
 from randomizer.rewards.catalogue import (
     BUFF_TARGETS, REWARD_POOL, MANDATORY_EXCLUDED_BUFF_TYPE_IDS, linked_buff_variant_ids,
 )
+from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS
 
 
 @lru_cache(maxsize=1)
@@ -16,6 +17,7 @@ def supported_pairs():
     return frozenset((variant, entry['buff_type']) for entry in REWARD_POOL
                      if entry.get('kind') == 'buff' and entry.get('unit') and entry.get('buff_type')
                      for variant in linked_buff_variant_ids(entry['unit'])
+                     if variant not in PORTABLE_STRUCTURE_IDS
                      if not BUFF_TARGETS.get(variant, {}).get('linked_buff_weapon_only')
                      and variant not in MANDATORY_EXCLUDED_BUFF_TYPE_IDS.get(entry['buff_type'], ()))
 

@@ -1,0 +1,80 @@
+{
+  "format": "mental-omega-randomizer-settings",
+  "version": 1,
+  "settings": {
+    "player_name": "Commander",
+    "seed": "StructureTryout149",
+    "mission_category": "challenge",
+    "coop_mode": false,
+    "challenge_player_count": 1,
+    "challenge_country": "UnitedStates",
+    "challenge_ai_enabled": false,
+    "campaign_filter": "All Campaigns",
+    "progression_mode": "Mission List",
+    "mission_goal": 22,
+    "difficulty": "Normal",
+    "game_speed": "4 - Fast",
+    "mission_pool_selection": {
+      "version": 2,
+      "cells": [
+        "challenges:Allies",
+        "challenges:Soviets",
+        "challenges:Epsilon",
+        "challenges:Foehn",
+        "challenges:Mixed"
+      ],
+      "cooperative_policy": "flexible"
+    },
+    "generation": {
+      "reward_mode": "Standard",
+      "include_special_buildings": true,
+      "include_special_rewards": true,
+      "include_defensive_buildings": true,
+      "start_with_tier_one_units": true,
+      "start_with_tier_one_defenses": true,
+      "unlimited_buildings": false,
+      "starting_reward_count": 0,
+      "starting_unlock_rewards": [
+        "Blackout Research Station Access",
+        "Weather Crystal Access",
+        "Yuri's Bust Access",
+        "Psychic Beacon Access",
+        "Psychic Amplifier Access",
+        "Hybrid Tower Access",
+        "Medic Bunker Access",
+        "SteinsTech Spectral Tower Access",
+        "Tech Oil Derrick Access",
+        "Tech Deposit Bank Access",
+        "Tech Power Plant Access",
+        "Tech Nuclear Plant Access",
+        "Tech Ore Refinery Access",
+        "Tech Base Expansion Post Access",
+        "Tech Satellite Hack Center Access",
+        "Tech Infantry Academy Access",
+        "Tech Heavy Machinery Access",
+        "Tech Aeronautics Access",
+        "Tech Defense Bureau Access",
+        "Tech Military Docks Access",
+        "Tech Machine Shop Access",
+        "Tech Hospital Access",
+        "Tech Airfield Access",
+        "Tech Reinforcement Pad Access",
+        "Tech Maintenance Facility Access",
+        "Tech Missile Bunker Access",
+        "Tech Secret Lab Access",
+        "Tech HMG Tower Access",
+        "Tech Turret Access",
+        "Tech SAM Site Access",
+        "Tech Cannon Bunker Access",
+        "Tech Artillery Bunker Access",
+        "Tech SAM Bunker Access",
+        "Tech Concrete Bunker Access",
+        "Tech Concrete Fortress Access",
+        "Tech Concrete Wall Access"
+      ]
+    },
+    "archipelago": {
+      "enabled": false
+    }
+  }
+}

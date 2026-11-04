@@ -87,7 +87,7 @@ class MissionGoal(Range):
     range_start = 1
     # Keep UI bounds independent of catalogue loading. The package builder
     # checks this literal against the largest bundled mission pool.
-    range_end = 97
+    range_end = 127
     default = 15
 
 
