@@ -218,6 +218,10 @@ def _ra2_rewards(rows, rewards, settings, country, randomized):
                         if not target.get('power_payload_only') and not target.get('runtime_transform')
                         and _eligible(installed.get(unit, {}), country))
     unlocked.update(unit for unit in ALWAYS_AVAILABLE_TECH_IDS if _eligible(installed.get(unit, {}), country))
+    secret_lab_access = GAME == 'mo' and 'CASLAB' in unlocked
+    direct_rejuvenator_access = 'REJU' in unlocked
+    if secret_lab_access:
+        unlocked.add('REJU')
     # Native production remains available to AI, including enemies of the same faction.
     for category in ('InfantryTypes', 'VehicleTypes', 'AircraftTypes', 'BuildingTypes'):
         for unit in installed.get(category, {}).values():
@@ -269,6 +273,9 @@ def _ra2_rewards(rows, rewards, settings, country, randomized):
         overlays.setdefault(unit, {}).update(planned.get(unit, {}))
         overlays[unit].update(starters.get(unit, {}))
         overlays[unit].update(TechLevel='1', Owner='RZPLAYER', RequiredHouses='RZPLAYER', ForbiddenHouses='none')
+    if secret_lab_access:
+        from randomizer.maps.reward_structures import secret_lab_unit_access_rules
+        overlays['REJU'].update(secret_lab_unit_access_rules())
     powers = apply_power_buffs_to_unlock_rewards(list(rewards), installed)
     payload = set()
     for reward in powers:
@@ -305,6 +312,7 @@ def _ra2_rewards(rows, rewards, settings, country, randomized):
         lines, list(rewards), installed, require_unlocked_access=randomized,
         additional_unlocked_tech_ids=unlocked | payload, buildable_tech_ids=unlocked,
         build_owner_ids=('RZPLAYER',), forced_buildable_clone_ids=unlocked,
+        unlimited_build_limit_building_ids=(unlocked if settings.get('unlimited_buildings') else ()),
         forced_isolated_clone_ids=payload, forced_compact_clone_ids=payload,
         share_basic_equivalent_buffs=False,
         unit_specific_mode=True, owned_clone_rule_overlays=overlays, **kwargs)
@@ -344,6 +352,13 @@ def _ra2_rewards(rows, rewards, settings, country, randomized):
         from randomizer.maps.special_buildings import reprocessor_bounty_rules
         bounty, _ = reprocessor_bounty_rules(lines, installed, handled, unlocked)
         merge_ini_section_values(lines, bounty)
+        from randomizer.maps.reward_structures import portable_structure_map_rules
+        merge_ini_section_values(lines, portable_structure_map_rules(
+            lines, handled, clone_ids,
+            secret_lab_access=secret_lab_access,
+            direct_rejuvenator_access=direct_rejuvenator_access,
+            unlimited_buildings=settings.get('unlimited_buildings', False),
+        ))
     rules, actions, _, startup, static, missing = cloned_superweapon_plan(
         lines, powers, installed_types, installed,
         superweapon_required_houses=('RZPLAYER',), force_required_houses=True)

@@ -12,7 +12,7 @@ from randomizer.rewards.roster import randomizer_unit_roster
 
 _TECHNO_LISTS = ('InfantryTypes', 'VehicleTypes', 'AircraftTypes', 'BuildingTypes')
 _OWNED_LOOKUPS = {
-    'academy.types', 'auxbuilding', 'sw.auxbuildings', 'sw.negbuildings',
+    'academy.types', 'academy.ignore', 'auxbuilding', 'sw.auxbuildings', 'sw.negbuildings',
     'sw.designators', 'sw.inhibitors', 'sw.launchsites', 'empulse.cannons',
     'hunterseeker.buildings', 'battery.overpower',
 }

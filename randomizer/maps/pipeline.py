@@ -108,6 +108,11 @@ from randomizer.maps.special_buildings import (
     refinery_miner_dock_rules,
     reprocessor_bounty_rules,
 )
+from randomizer.maps.reward_structures import (
+    LAB_ID, LAB_UNIT_ID, portable_structure_map_rules,
+    secret_lab_unit_access_rules,
+)
+from randomizer.rewards.structures import PORTABLE_STRUCTURE_IDS
 from randomizer.missions.houses import (
     mission_house_config,
     mission_player_power_houses,
@@ -473,10 +478,19 @@ def prepare_hooked_map(self, mission, extra_rules=None):
         lines,
         fallback_tech_ids,
     )
+    # The lab is an earned building, not a second permanent Rejuvenator
+    # reward. Prepare its dependent clone while keeping the physical lab
+    # prerequisite until the map's final clone identities are allocated.
+    secret_lab_access = launch_active and LAB_ID in mission_effective_tech_ids
+    direct_rejuvenator_access = LAB_UNIT_ID in mission_effective_tech_ids
+    if secret_lab_access:
+        mission_effective_tech_ids.add(LAB_UNIT_ID)
     rule_sections = self.map_rules_for_launch(
         extra_rules,
         allowed_unlocked_tech_ids=mission_effective_tech_ids,
     )
+    if secret_lab_access:
+        rule_sections.setdefault(LAB_UNIT_ID, {}).update(secret_lab_unit_access_rules())
     owned_clone_rule_overlays = {}
     for section in list(rule_sections):
         section_upper = str(section).upper()
@@ -1650,6 +1664,8 @@ def prepare_hooked_map(self, mission, extra_rules=None):
     safe_player_country_buffs = bool(generation_config.get('safe_player_country_buffs', True))
     require_unlocked_access_for_buffs = self.randomize_unit_access_enabled()
     buff_access_tech_ids = set(fallback_tech_ids) | set(mission_buff_unit_ids)
+    if secret_lab_access:
+        buff_access_tech_ids.add(LAB_UNIT_ID)
     # Power-only payloads have no production-access reward. Owning their power
     # is their access proof, so their earned unit/defense buffs stay active.
     buff_access_tech_ids.update(delivery_clone_ids)
@@ -2521,8 +2537,9 @@ def prepare_hooked_map(self, mission, extra_rules=None):
             share_basic_equivalent_buffs=share_basic_equivalent_buffs,
             unit_specific_mode=chaos_unit_specific_buffs,
             clone_handled=clone_handled,
-            excluded_unit_ids=MISSION_NATIVE_DIRECT_BUFF_EXCLUSIONS.get(
-                code, ()
+            excluded_unit_ids=(
+                set(MISSION_NATIVE_DIRECT_BUFF_EXCLUSIONS.get(code, ()))
+                | set(PORTABLE_STRUCTURE_IDS)
             ),
             excluded_player_houses=excluded_player_houses,
         )
@@ -3310,6 +3327,15 @@ def prepare_hooked_map(self, mission, extra_rules=None):
         if cannon_rules:
             merge_ini_section_values(lines, cannon_rules)
             self.append_log('Linked EMPulse support powers to player building clones.')
+        structure_rules = portable_structure_map_rules(
+            lines, clone_handled, owned_clone_ids,
+            secret_lab_access=secret_lab_access,
+            direct_rejuvenator_access=direct_rejuvenator_access,
+            unlimited_buildings=self.active_reward_settings().get('unlimited_buildings', False),
+        )
+        if structure_rules:
+            merge_ini_section_values(lines, structure_rules)
+            self.append_log('Resolved portable structure training, provider and construction prerequisites.')
 
     packed_sections = {
         'PreviewPack', 'IsoMapPack5', 'OverlayPack', 'OverlayDataPack',

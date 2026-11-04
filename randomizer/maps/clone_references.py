@@ -3,6 +3,7 @@
 from randomizer.rewards.healing import self_healing_metadata
 
 from ._shared import (
+    BUFF_TARGETS,
     CLONE_POLICY,
     MAX_MAP_ACTION_LINE_LENGTH,
     TECHNO_TYPE_LISTS,
@@ -57,6 +58,10 @@ def prism_forwarding_clone_rules(lines, installed_sections, clone_handled):
     rules = {}
     for source, details in clone_handled.items():
         source = str(source).upper()
+        if BUFF_TARGETS.get(source, {}).get('portable_structure'):
+            # Portable campaign defenses have their own bounded network;
+            # native mission towers must not gain links to reward copies.
+            continue
         if source not in buildings:
             continue
         native = effective.get(source, {})

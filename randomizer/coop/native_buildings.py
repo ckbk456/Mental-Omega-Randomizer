@@ -104,7 +104,8 @@ def apply_building_reward_buffs(changes, source, values, target, counts,
             continue
         key = str(weapon).upper()
         if key not in replacements:
-            definition = _merge(_lookup(installed, weapon), _lookup(map_sections, weapon))
+            definition = _merge(_lookup(installed, weapon), _lookup(map_sections, weapon),
+                                _lookup(changes, weapon))
             if not definition:
                 raise ValueError(f'Missing building weapon: {source} {weapon}')
             defaults = targets.get(key, {})
@@ -156,6 +157,9 @@ def preserve_native_building_abilities(changes, building_clones, installed,
 
     building_ids = {str(source).upper(): clone
                     for source, clone in building_clones.items()}
+    building_references = dict(building_ids)
+    building_references.update({f'MORP{source}': clone
+                                for source, clone in building_ids.items()})
     reserved = {str(name).upper() for registry in (installed, map_sections, changes)
                 for name in registry}
     power_ids = {}
@@ -189,7 +193,7 @@ def preserve_native_building_abilities(changes, building_clones, installed,
                 values[field] = ','.join(private_power(item, provider)
                                          for item in _items(raw)) or raw
             elif lowered in _OWNED_BUILDING_LINKS:
-                values[field] = ','.join(building_ids.get(item.upper(), item)
+                values[field] = ','.join(building_references.get(item.upper(), item)
                                          for item in _items(raw)) or raw
         if str(_value(values, 'Type')).lower() == 'empulse':
             cannons = _items(_value(values, 'EMPulse.Cannons'))
@@ -197,7 +201,7 @@ def preserve_native_building_abilities(changes, building_clones, installed,
             # player may now mix all factions' cannons, so restrict that case
             # to the actual provider instead of firing another earned weapon.
             _set(values, 'EMPulse.Cannons', ','.join(
-                building_ids.get(item.upper(), item) for item in cannons
+                building_references.get(item.upper(), item) for item in cannons
             ) if cannons else building_ids[provider])
         return clone
 

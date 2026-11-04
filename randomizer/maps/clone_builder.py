@@ -623,6 +623,10 @@ def build_player_clone_sections(
 
     for unit_id, target_unit_id, counts in clone_candidates:
         unit_id = str(unit_id).upper()
+        portable_build_only_clone = bool(
+            BUFF_TARGETS.get(unit_id, {}).get('portable_structure')
+            and unit_id in buildable_ids
+        )
         linked_peer_ids = linked_buff_variant_ids(unit_id) - {unit_id}
         linked_candidate_clone = any(
             peer_id in candidate_counts_by_id
@@ -684,6 +688,7 @@ def build_player_clone_sections(
             excluded_build_only_clone
             or hero_build_only_clone
             or initial_payload_clone
+            or portable_build_only_clone
         )
         if (
             unit_id in excluded_unit_ids
@@ -726,6 +731,7 @@ def build_player_clone_sections(
         target = BUFF_TARGETS.get(target_unit_id, {})
         build_only_clone = (
             excluded_build_only_clone
+            or portable_build_only_clone
             or initial_payload_clone
             or linked_excluded_reference_clone
             or linked_script_reference_clone
@@ -804,7 +810,9 @@ def build_player_clone_sections(
         # clones copy the installed identity, so their cap must also come from
         # installed rules. Map-only types keep their map-authored live cap.
         clone_build_limit = _positive_build_limit(
-            installed_sections.get(installed_unit, {})
+            owned_template
+            if identity_target.get('portable_structure') and owned_template
+            else installed_sections.get(installed_unit, {})
             if installed_unit
             else native_unit_values
         )
@@ -830,6 +838,7 @@ def build_player_clone_sections(
             clone_source_values = dict(installed_sections[installed_unit])
         mission_player_override = bool(
             owned_template is not None
+            and not identity_target.get('portable_structure')
             and not build_only_clone
             and any(house.lower() in allowed_houses for house in unit_usage)
         )
@@ -1031,6 +1040,8 @@ def build_player_clone_sections(
                     installed_weapon,
                     map_weapon,
                 )
+                if not weapon_values:
+                    weapon_values = dict(STANDALONE_WEAPON_TEMPLATES.get(weapon.upper(), {}))
                 if not weapon_values:
                     continue
                 weapon_targets[weapon] = {
@@ -1600,6 +1611,7 @@ def build_player_clone_sections(
         )
         safe_direct_rewrite = (
             unit_id in direct_friendly_ids
+            and not portable_build_only_clone
             and not excluded_build_only_clone
             # Build-only clones have no matching trigger/TaskForce rewrite.
             # Keep exact story identities native; ordinary selectable starting

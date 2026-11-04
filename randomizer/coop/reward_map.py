@@ -27,6 +27,9 @@ from randomizer.coop.native_units import TRANSFORM_REFERENCE_KEYS, unit_transfor
 from randomizer.maps.powers import (
     append_static_startup_buildings, append_superweapon_grant_trigger,
 )
+from randomizer.maps.reward_structures import (
+    LAB_ID, LAB_UNIT_ID, portable_structure_reference_rules,
+)
 from randomizer.missions.access import CHAOS_PRIMARY_PRODUCTION
 from randomizer.rewards.arsenal import arsenal_unit_type
 from randomizer.rewards.catalogue import BUFF_TARGETS, canonical_reward
@@ -108,6 +111,10 @@ def apply_coop_rewards(lines: list[str], manifest: dict, family: str, *,
               if buff_counts is None else buff_counts)
     unlimited_buildings = manifest.get('unlimited_buildings', False)
     building_roots = {str(item).upper() for item in building_ids}
+    direct_rejuvenator_access = LAB_UNIT_ID in {str(item).upper() for item in access_ids}
+    secret_lab_access = LAB_ID in building_roots
+    if secret_lab_access and not direct_rejuvenator_access:
+        access_ids = [*access_ids, LAB_UNIT_ID]
     _, clone_ids, templates = randomizer_unit_roster()
     _, installed = installed_rules_registry(synchronous=True)
     templates, _ = installed_rules_template_overlay(templates, installed)
@@ -376,6 +383,8 @@ def apply_coop_rewards(lines: list[str], manifest: dict, family: str, *,
         # while the reviewed clone policy still controls independent powers
         # and production access (for example the Industrial Plant's Gear Change).
         for key, value in _lookup(map_sections, source_id).items():
+            if BUFF_TARGETS[source_id].get('portable_structure'):
+                continue
             if key.lower() in {
                 'strength', 'armor', 'power', 'powered', 'cost', 'sight',
                 'ammo', 'storage', 'producecashamount', 'producecashdelay',
@@ -386,7 +395,8 @@ def apply_coop_rewards(lines: list[str], manifest: dict, family: str, *,
                         values.pop(previous)
                 values[key] = value
         values.update({
-            'Image': native.get('Image') or source_id,
+            'Image': next((value for key, value in values.items()
+                           if key.lower() == 'image'), native.get('Image') or source_id),
             'TechLevel': '1', 'Owner': clone_production_owners(native, country),
             'RequiredHouses': country,
             'ForbiddenHouses': 'none',
@@ -397,6 +407,10 @@ def apply_coop_rewards(lines: list[str], manifest: dict, family: str, *,
         })
         if manifest.get('reward_mode') == 'Standard':
             values.update(standard_coop_access_rules(source_id))
+        for type_list, definitions in STANDALONE_UNIT_RULE_TEMPLATES.get(source_id, {}).items():
+            for type_id, definition in definitions.items():
+                changes[type_id] = dict(definition)
+                register(type_list, type_id)
         building_counts = counts.get(source_id, {})
         apply_building_reward_buffs(
             changes, source_id, values, BUFF_TARGETS[source_id], building_counts,
@@ -448,6 +462,13 @@ def apply_coop_rewards(lines: list[str], manifest: dict, family: str, *,
             country_values[key] = ','.join(filter(None, [existing, *ids]))
     if country_values:
         changes[country] = country_values
+    for section, values in portable_structure_reference_rules(
+        changes, handled, clone_ids,
+        secret_lab_access=secret_lab_access,
+        direct_rejuvenator_access=direct_rejuvenator_access,
+        unlimited_buildings=unlimited_buildings,
+    ).items():
+        changes.setdefault(section, {}).update(values)
     merge_ini_section_values(lines, changes)
 
 

@@ -90,7 +90,7 @@ def resolved_academy_clone_rules(
     clone_handled,
     owned_clone_ids,
 ):
-    """Point Academy.Types at the player TechnoTypes registered for this map.
+    """Point Academy.Types/Ignore at the registered player TechnoTypes.
 
     Veteran player units use compact IDs to keep Country Veteran* lists within
     Ares' parser limit. Static MORP IDs in a delivered Academy are therefore
@@ -111,7 +111,7 @@ def resolved_academy_clone_rules(
         if not isinstance(values, dict):
             continue
         for key, value in values.items():
-            if str(key).lower() != 'academy.types':
+            if str(key).lower() not in {'academy.types', 'academy.ignore'}:
                 continue
             resolved = []
             for type_id in comma_items(value):
