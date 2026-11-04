@@ -1,6 +1,6 @@
 # Campaign and tech reward structures
 
-Status: **pending design and implementation**. See the
+Status: **selected design decisions recorded on 2026-11-04; implementation and gameplay QA pending**. See the
 [research proposal](../../docs/research/campaign-structure-rewards.md).
 
 After an approved implementation, record version, installed engine, mission,
@@ -30,3 +30,18 @@ Exercise the existing unlimited-buildings option and document which caps it lift
 Any proposed strategic/economic exception requires an explicit design decision;
 do not silently override the user option.
 No live result is marked passed by this checklist's existence.
+
+## Selected-decision checks
+
+- Psychic Amplifier: confirm 32 reversible slots, $15,000 cost, 900 power, range 18,
+  3,200 HP and 180-frame acquisition. At capacity it must not behave as an unlimited
+  permanent controller. Destroy it and verify controlled units return; native
+  psionic immunity and unrelated Mastermind overload behavior remain intact.
+- Gladius and Mental Omega Device must not appear as additions from this feature.
+- With direct Rejuvenator Access and a War Factory, production needs no Secret Lab.
+- With only Secret Lab Access and a War Factory, the Rejuvenator remains unavailable
+  until the lab is built. Construction must activate the benefit without requiring
+  an engineer capture. Lose/sell and rebuild it to verify the prerequisite follows
+  ownership; already produced units remain intact.
+- With both rewards, losing the lab must not disable direct Rejuvenator Access.
+  Check the separate reward identities and requirements on both human players.

@@ -6,7 +6,7 @@ from a map audit, screenshot, compiler or successful process launch.
 
 | Domain | Checklist / owning guide | Current gate |
 | --- | --- | --- |
-| New campaign/tech reward buildings | [Reward structures](reward-structures.md) | Proposal pending; no new building behavior verified |
+| New campaign/tech reward buildings | [Reward structures](reward-structures.md) | Selected decisions recorded; implementation and gameplay QA pending |
 | Solo/AI/human challenges, houses, colors, results | [Existing challenge guide](../../CHALLENGES_TESTING.md) | Recheck changed behavior in an actual match |
 | Mixed pools, saved runs, Shop and adaptive parties | [Mixed-run guide](../../MIXED-RUNS.md) | Two-PC gameplay remains pending for local 1.48.1 |
 | Native connection and guest restore | [Connection guide](../../COOP_CONNECTION_GUIDE.md) | Requires both named machines/builds |

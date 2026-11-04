@@ -1,12 +1,25 @@
 # Campaign and tech structure reward proposal
 
-**Status: research/proposal only — 2026-11-03.** The user explicitly chose to
+**Status: proposal revised — 2026-11-04.** The user explicitly chose to
 propose both sets before implementing them. No reward, unit, weapon, game asset,
 installed launcher or save was changed by this research.
 
 Branch: `codex/campaign-structure-rewards`, from local 1.48.1 commit
 `30745f68e61a34db594d0a6656c4c4c24bf7dd44`. Repository workflow changes are separate
 from this unimplemented balance design.
+
+## Selected decisions — 2026-11-04
+
+- Psychic Amplifier uses **32 reversible slots, 15,000 credits and 900 power**.
+  Range 18, 3,200 HP, acquisition every 180 frames and default cap 1 remain proposed.
+  Controlled units return to their previous owners when the controller is destroyed.
+- Gladius Defense System and Mental Omega Device are **removed from this feature**.
+- Secret Lab remains a **separate buildable access reward**. Direct Rejuvenator
+  Access permits production with a War Factory. Secret Lab Access requires the
+  player to construct the lab as well before its Rejuvenator production is available.
+  The two access rewards must not be merged, aliased or treated as duplicates.
+
+These decisions revise the design; gameplay implementation has not started.
 
 ## Reading the numbers
 
@@ -15,8 +28,8 @@ from this unimplemented balance design.
 - `−power` means continuous consumption; `+power` means generation. Weapon range
   is in map cells. Damage is before armor multipliers. ROF and EMP duration are
   simulation frames (`f`); wall-clock performance changes with selected game speed.
-- Support-power recharge values use native `RechargeTime` game minutes. Device
-  450 f is 30 nominal game seconds, not a promise of 30 wall-clock seconds at every speed.
+- Support-power recharge values use native `RechargeTime` game minutes; their
+  wall-clock duration changes with game speed.
 - Cost, power, HP and caps below are **recommended initial balance**, unless stated
   as retained native values. They have not been playtested.
 - Default caps are ordinary balance proposals. The existing unlimited-buildings
@@ -27,7 +40,7 @@ from this unimplemented balance design.
 
 The installed rules identify Mental Omega 3.3.6. `Ares.dll` file version is
 20.333.289; no `Phobos.dll` was found. The installed rules cache matches the
-highest-precedence `RULESMO.INI` in `expandmo 99.mix`:
+highest-precedence `RULESMO.INI` in `expandmo99.mix`:
 
 `SHA-256 8607e14e36a3bfeef16427f739123605baa92d094b8370a5f47253dfda29b747`
 
@@ -55,7 +68,7 @@ provides feature semantics, not proof that a proposed combination works in-game.
 Nominal damage divided by ROF is only a comparison tool. Armor, acquisition delay,
 burst timing, splash, retargeting and overkill affect actual output.
 
-## Ten campaign structures
+## Eight campaign structures
 
 | Proposed unlock | Credits | Power | HP | Proposed effect | Default cap |
 | --- | ---: | ---: | ---: | --- | ---: |
@@ -63,12 +76,10 @@ burst timing, splash, retargeting and overkill affect actual output.
 | Weather Crystal `GARAIN` | 6,000 | −400 | 1,600 | Regenbogen CrystalHeavyGun: 60×3, ROF 10 f, range 14, two 60-damage shrapnel projectiles per impact; anti-army | 2 |
 | Yuri's Bust `CAEAST02` | 3,500 | −200 | 2,000 | Native ground dissolver:100×2, ROF 50 f, range 15; retains veterancy | None |
 | Psychic Beacon `NAPSYB` | 5,000 | −250 | 1,500 | 9 reversible mind-control slots; range 12; acquisition every 90 f; ground units | None |
-| Psychic Amplifier `NAPSYA` | 20,000 | −1,200 | 3,200 | Unlimited **permanent** unit captures; range 18; one acquisition/180 f; no buildings | 1 |
-| Mental Omega Device `MODEV` | 100,000 | −5,000 | 10,000 | Desired manual global capture,450 f cooldown, no auto attack or free reveal; universal target coverage requires prototype | 1 |
+| Psychic Amplifier `NAPSYA` | 15,000 | −900 | 3,200 | 32 reversible mind-control slots; range 18; one acquisition/180 f; ground units, no buildings | 1 |
 | Hybrid Tower `GAHYBR` | 5,000 | −300 | 1,050 | Ground weapon 30/ROF 2 f/range 14; bounded links within 6 cells,+20% per helper, maximum 4 helpers | 3 |
 | Medic Bunker `NAHOSP` | **600** | **−10** | **1,000** | Retain native one-at-a-time infantry enter/heal/exit; no weapon | None |
 | SteinsTech Spectral Tower `FTHQ` | 6,000 | −450 | 2,000 | Lights Out ground beam 150/ROF 40 f/range 20; no prism networking or AA | 1 |
-| Gladius Defense System `CADEFN` | 25,000 | −2,500 | 6,000 | Custom AA beam 300/ROF 2 f/range 22;10× Hyperion's nominal weapon output; single-target initial design | 1 |
 
 ### Identity, feasibility and balancing decisions
 
@@ -105,30 +116,14 @@ positions; this Beacon trades positional flexibility for 12-cell reach and a
 single vulnerable controller. Destroying it releases its controlled units.
 [Beacon reference](https://moapyr.fandom.com/wiki/Psychic_Beacon).
 
-**Psychic Amplifier.** Ares documents unlimited **permanent** mind control. That
-means captured units stay yours after the Amplifier dies. Keep normal psionic
-immunity and target ground units, not buildings. Do not turn on Mastermind-style
-`InfiniteMindControl` and globally disable overload: that would change unrelated
-units. If reversible tower-style control is preferred, the alternative proposal
-is **32 slots,15,000 credits,900 power,range 18,ROF 180 f**, released on destruction.
-That alternative is finite and should be labeled honestly.
-[Amplifier reference](https://moapyr.fandom.com/wiki/Psychic_Amplifier),
-[Ares permanent mind control](https://ares-developers.github.io/Ares-docs/new/warheads/mindcontrol.html).
-
-**Mental Omega Device.** 100,000 credits and 5,000 power reflect repeated global
-ownership changes, far beyond a conventional tower. Keep the native base 10,000 HP,
-not campaign 1,000,000 HP/invulnerability. Its 10×10 custom foundation is a real space
-cost. Manual-only targeting is documented, but the universal capture promise is
-not established: permanent control can affect buildings while retaining normal
-immunity; Dominator options can override psionic immunity but do not capture
-buildings. GenericWarhead targets a cell, not an exact object, so airborne and
-single-object selection need a prototype. Target visible hostile eligible objects;
-mission-critical/neutral scripted objectives require an explicit exclusion policy.
-Price alone cannot prevent a broken mission. No automatic attacks or free reveal.
-[Device reference](https://moapyr.fandom.com/wiki/Mental_Omega_Device),
-[Ares manual targeting](https://ares-developers.github.io/Ares-docs/new/superweapons/targeting.html),
-[GenericWarhead](https://ares-developers.github.io/Ares-docs/new/superweapons/types/genericwarhead.html),
-[Dominator options](https://ares-developers.github.io/Ares-docs/new/superweapons/types/psychicdominator.html).
+**Psychic Amplifier.** The selected design is **32 reversible slots, 15,000 credits,
+900 power, range 18 and acquisition every 180 frames**, with 3,200 HP and default cap 1.
+It uses ordinary finite tower-style control: controlled units return to their
+previous owners when the Amplifier is destroyed. Preserve normal psionic immunity
+and restrict acquisition to ground units. Do not use permanent capture or alter
+Mastermind overload settings. Finite capacity and a slower acquisition cadence
+balance its substantially larger capacity and reach than the Beacon.
+[Amplifier reference](https://moapyr.fandom.com/wiki/Psychic_Amplifier).
 
 **Hybrid Tower.** The native placeholder 1,600-credit cost is not a good cross-faction
 unlock price for its rapid 30/2 f/range 14 ground weapon. The installed support weapon
@@ -151,16 +146,6 @@ Heavyobject's weaker 120/range 14 override. Remove the mission's `Factory=Infant
 convenience and unusual armor. Its range is the premium; it should not also gain
 free prism networking or AA. Art is `FAHQ`, footprint 4×4.
 [Spectral reference](https://moapyr.fandom.com/wiki/SteinsTech_Spectral_Tower).
-
-**Gladius.** Native `CADEFN` is a 3,000-HP story object with no reusable weapon.
-Its anti-ICBM narrative does not imply a functional nuclear-missile interceptor.
-A 300/2 f AA beam is exactly 10× the Hyperion's 30/2 f nominal output, with more range
-and a 12.5× construction/power cost. It is strong enough to satisfy the requested
-AA role without claiming ten targets. Ares split projectiles can retarget, but
-neither splits nor `Burst=10` guarantees ten different simultaneous targets.
-Treat multi-target fire as a separate prototype, not a promised first version.
-[Gladius reference](https://moapyr.fandom.com/wiki/Gladius_Defense_System),
-[Ares splits](https://ares-developers.github.io/Ares-docs/new/projectiles/splits.html).
 
 ## Buildable tech-building access rewards
 
@@ -192,7 +177,7 @@ describes their roles. Installed definitions supply the values below.
 | Reinforcement Pad `CATPAD` | 4,000 | −100 | 1,200 | Native automatic faction-specific vehicle shipment, recharge 5; cap 1 |
 | Maintenance Facility `CASTRF` | 2,500 | −100 | 1,000 | Native building-maintenance power, radius 12/effect 600f/recharge 5; cap 1 |
 | Missile Bunker `CAMISL` | 3,000 | −150 | 1,200 | Native Missile Strike,1,500 credits per activation/recharge 7.5; cap 1 |
-| Secret Lab `CASLAB` — conditional | 2,000 | −100 | 1,100 | Fixed Rejuvenator access while owned; cap 1; canonical unlock/reward overlap must be decided first |
+| Secret Lab `CASLAB` | 2,000 | −100 | 1,100 | Separate access reward: construct the lab, then produce Rejuvenators at a War Factory while the lab is owned; cap 1 |
 
 Oil and bank both repay their price after 10,000 simulation frames before losses,
 without capture bounties. Bank consolidates two derricks into one weaker combined
@@ -209,6 +194,28 @@ must be expanded for player clones. Hospital
 and Machine Shop are global maintenance benefits, unlike the local entry-based
 Medic Bunker or local vehicle Repair Crane. Passive global bonuses may not obey
 `Powered=yes` outages; do not promise low-power shutdown before engine verification.
+
+### Secret Lab and direct Rejuvenator Access
+
+The user confirmed that these are distinct progression paths. Direct Rejuvenator
+Access enables the unit once a usable War Factory exists. Secret Lab Access first
+unlocks construction of the lab; the player pays its 2,000-credit construction cost
+and 100-power requirement before that lab supplies Rejuvenator access.
+
+| Earned access / owned structures | Rejuvenator production from these rewards |
+| --- | --- |
+| Direct Rejuvenator Access + War Factory; no lab | Available |
+| Secret Lab Access + War Factory; lab not constructed | Unavailable |
+| Secret Lab Access + constructed/owned lab + War Factory | Available while the lab remains owned |
+| Both rewards + War Factory; lab absent or lost | Available through direct Rejuvenator Access |
+| Either path without a usable War Factory | Unavailable |
+
+Losing or selling the lab removes only the lab-provided route to future production.
+It must not revoke separately earned direct Rejuvenator Access or delete units
+already produced. The lab grants a fixed Rejuvenator boon, with no capture/rebuild
+reroll. Preserve unrelated native capturable labs and their mission scripts.
+Construction-vs-capture activation and compact player-clone prerequisites remain
+implementation checks, not an unresolved product distinction.
 
 ### Native tech defenses and fortifications
 
@@ -252,9 +259,11 @@ normal reward candidates. A Tech Resource Forge was not found in this installed 
    clones. Military Docks whitelists ships; Heavy Machinery excludes them. The
    existing resolver covers `Academy.Types` in power-provider rules only and is not
    a complete solution for all new buildings. [Ares academies](https://ares-developers.github.io/Ares-docs/new/buildings/academy.html).
-7. Secret Lab's fixed native `REJU` boon overlaps Rejuvenator Access. Resolve the
-   canonical relationship and construction-vs-capture behavior before inclusion;
-   no random mission boons or rebuild rerolls. [Ares Secret Labs](https://ares-developers.github.io/Ares-docs/new/buildings/secretlabs.html).
+7. Keep Secret Lab Access and direct Rejuvenator Access as separate reward IDs.
+   The lab route requires a constructed/owned player lab plus a usable War Factory;
+   the direct route requires no lab. Verify activation on construction and loss/sale
+   without revoking direct access or deleting produced units. No random mission
+   boons or rebuild rerolls. [Ares Secret Labs](https://ares-developers.github.io/Ares-docs/new/buildings/secretlabs.html).
 8. Extend clone-aware refinery docking and Expansion Post provider references.
    Support powers retain their intended recharge, per-use cost and shared-provider
    semantics; duplicate buildings must not silently multiply timers.
@@ -274,28 +283,28 @@ specific installed version and can move after updates.
 
 | Evidence | Location / section |
 | --- | --- |
-| Native baselines and requested structures | `RandomizerLauncherData/cameo_cache/rulesmo.ini`: Hyperion 46349; Prism 46572; GrandCannon46638; Tesla 48335; Crane 48514; Medic 48797; PsychicTower50121; Dominator 50774; Device 56331; Spectral 56363; Hybrid 56387; Blackout 56887; Crystal 56935; Beacon 57384; Amplifier 57507; Gladius 57958; Bust 64141 |
+| Native baselines and requested structures | `RandomizerLauncherData/cameo_cache/rulesmo.ini`: Hyperion 46349; Prism 46572; GrandCannon46638; Tesla 48335; Crane 48514; Medic 48797; PsychicTower50121; Dominator 50774; Spectral 56363; Hybrid 56387; Blackout 56887; Crystal 56935; Beacon 57384; Amplifier 57507; Bust 64141 |
 | Native tech set | Same rules file,52989–54272; Oil 53989; Bank 54028; healing constants 26–29 |
-| Named weapons | Same rules file: Hyperion 75465/75480; Bust 83137; Hybrid 84548; mindcontrol 85357; Spectral 87222; permanent controller warhead 104156; BustWH109200 |
+| Named weapons | Same rules file: Hyperion 75465/75480; Bust 83137; Hybrid 84548; mindcontrol 85357; Spectral 87222; BustWH109200 |
 | Regenbogen Crystal | `MapsMO/Challenge/c_regenbogen.map`: immunity 25; weapons 82/91; projectile 99; GARAIN147; warhead 1692 |
 | Spectral variants | `MapsMO/Cooperative/coop_slights.map:80`; `MapsMO/Challenge/c_heavyobject.map:82` |
-| Blackout mission | `expandmo 97.mix → SECLIPSE.MAP`: WH49; station 166; emitter 348; team 2306; capture/destruction 3374–3375 |
-| Buildable Beacon precedent | `expandmo 97.mix → SPEACE.MAP:165–189` |
-| Amplifier durability | `expandmo 97.mix → ENIGHT.MAP:273–290` |
-| Device mission extremes | `expandmo 99.mix → AHAMARTIA.MAP:3699–3706`, `EMIGDAL.MAP:4594–4602` |
-| Artwork/footprints | `RandomizerLauncherData/cameo_cache/artmo.ini`: Bust 17184; Hybrid 17227; Crystal 21364; Gladius 21620; Device 22242; Spectral 23567; Beacon 23702/23746; Amplifier 23854 |
+| Blackout mission | `expandmo97.mix → SECLIPSE.MAP`: WH49; station 166; emitter 348; team 2306; capture/destruction 3374–3375 |
+| Buildable Beacon precedent | `expandmo97.mix → SPEACE.MAP:165–189` |
+| Amplifier durability | `expandmo97.mix → ENIGHT.MAP:273–290` |
+| Artwork/footprints | `RandomizerLauncherData/cameo_cache/artmo.ini`: Bust 17184; Hybrid 17227; Crystal 21364; Spectral 23567; Beacon 23702/23746; Amplifier 23854 |
 | Retired Protector | `configs/rewards/catalogue.json`, `retired_reward_by_name` |
 | Academy reference plumbing | `randomizer/maps/base.py`, `resolved_academy_clone_rules` |
 
-## Decisions before gameplay implementation
+## Remaining work before gameplay implementation
 
-Recommended first group: Medic Bunker, Bust, Weather Crystal, Hybrid and Spectral,
-plus verified economic/support/training tech structures. Beacon follows with a new
-isolated weapon. Blackout needs a dedicated provider. Amplifier, Device and Gladius
-need the specific behavior decisions and engine checks described above.
+The eight selected campaign candidates are Medic Bunker, Bust, Weather Crystal,
+Hybrid, Spectral, Beacon, Blackout and the 32-slot reversible Amplifier. The tech
+set retains Secret Lab as its own buildable reward. Gladius and Mental Omega
+Device are outside this feature's scope.
 
-Choose permanent versus 32-slot reversible Amplifier; desired Device exceptions;
-whether a powerful single-target Gladius is acceptable before multi-target research;
-which economic caps the unlimited-buildings option may lift; and whether Secret
-Lab adds a distinct reward or is an alternate Rejuvenator access route. These are
-pending balance/product decisions, not requests to publish, merge or install.
+Remaining design decisions concern other balance values and which economic caps
+the unlimited-buildings option may lift. Implementation must verify native ability
+providers, finite controller capacity/release, Secret Lab construction prerequisites,
+artwork/foundations, actual-map compatibility and the manual QA checklist.
+The selected Amplifier behavior and Secret Lab reward distinction are settled.
+These decisions do not authorize publication, merging or an installed-game update.

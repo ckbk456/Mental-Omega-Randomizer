@@ -118,5 +118,8 @@ All task-owned inspection/validation commands completed. No persistent process,
 server, migration, engine dependency, generated release or installed-game update
 was started. No external credential/provider permission is needed for this local
 handoff. Remote publication/merge/release authority remains **not granted**.
-Human decisions remaining: building selections and balance; prototype acceptance
-for unlimited/permanent control, global capture and multi-target AA; later manual QA.
+Decision update 2026-11-04: the user selected the 32-slot reversible Amplifier,
+removed Gladius and Mental Omega Device, and retained Secret Lab as a distinct
+reward requiring lab construction before Rejuvenator production. Remaining work
+is other balance decisions, implementation of the selected prerequisites/abilities,
+and later manual QA; these resolved choices need no further confirmation.
