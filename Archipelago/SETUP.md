@@ -2,10 +2,14 @@
 
 ## Required versions
 
-- Mental Omega Randomizer Launcher 1.47
+- Mental Omega Randomizer Launcher 1.49.1
 - Mental Omega 3.3.6 in a separate, unmodified installation
 - Archipelago 0.6.8
 - `mental_omega.apworld` from the same Randomizer release as the launcher
+
+The 1.49.1 fork test build pairs with APWorld 0.6.11. See the
+[update handoff](../docs/UPDATE-1.49.1.md) for direct downloads and preservation
+of existing player data. Standalone challenges do not require Archipelago.
 
 ## Install
 
