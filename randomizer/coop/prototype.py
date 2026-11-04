@@ -227,6 +227,11 @@ def _launch_rewards(state: dict, source_mission: str = '', country: str = '') ->
 def _buff_counts(rewards: list[dict], access_ids: list[str],
                  building_ids=()) -> dict:
     earned_ids = sorted(set(access_ids) | set(building_ids))
+    if 'CASLAB' in earned_ids and 'REJU' not in earned_ids:
+        # The lab supplies conditional production, so its Rejuvenator also
+        # receives earned unit buffs. This does not add direct access to the
+        # manifest: selling the lab must still close this production route.
+        earned_ids.append('REJU')
     counts = _active_direct_buff_counts(
         rewards, additional_unlocked_tech_ids=earned_ids,
         unit_specific_mode=True, global_production_unit_ids=earned_ids,
@@ -741,8 +746,11 @@ def rebuild_from_manifest(game_root: Path, manifest: dict) -> bytes:
         raise ValueError('Invalid co-op enemy reward manifest.')
     for candidate_id in access_ids:
         _require_registered_type(source, candidate_id, registered_types)
+    buff_access = set(access_ids) | set(building_ids)
+    if 'CASLAB' in buff_access:
+        buff_access.add('REJU')
     for candidate_id, counts in buff_counts.items():
-        if (candidate_id not in set(access_ids) | set(building_ids)
+        if (candidate_id not in buff_access
                 or not isinstance(counts, dict)):
             raise ValueError('Invalid co-op buff target.')
         if any(not isinstance(buff_type, str) or type(value) is not int

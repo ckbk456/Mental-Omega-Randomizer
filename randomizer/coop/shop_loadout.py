@@ -127,7 +127,10 @@ def _validate_shop_loadout(source: Path, loadout: dict, *, allow_empty=False,
                    } for item in building_ids)
             or building_ids != sorted(set(building_ids))):
         raise ValueError('Invalid co-op Shop building access.')
-    if set(buff_counts) - (set(access_ids) | set(building_ids)):
+    buff_access = set(access_ids) | set(building_ids)
+    if 'CASLAB' in buff_access:
+        buff_access.add('REJU')
+    if set(buff_counts) - buff_access:
         raise ValueError('Co-op buffs require earned unit or building access.')
     credit_bonus = loadout.get('starting_credit_bonus', 0)
     if type(credit_bonus) is not int or not -10000 <= credit_bonus <= 50000:
