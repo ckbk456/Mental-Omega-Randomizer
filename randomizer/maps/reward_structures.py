@@ -34,6 +34,45 @@ def secret_lab_unit_access_rules():
     }
 
 
+def _inherited_paradrop_rules(sections, powers):
+    """Carry native country drop recipes onto campaign/player child countries.
+
+    Ares' SW-specific ParaDrop.Country fields match the actual CountryType;
+    ParentCountry alone does not supply that entry in a private power's INI.
+    """
+    parents = {
+        str(section).upper(): str(value).strip()
+        for section, values in sections.items()
+        for key, value in values.items()
+        if str(key).lower() == 'parentcountry' and str(value).strip()
+    }
+    country_names = {str(section).upper(): str(section) for section in sections}
+    updates = {}
+    for section, values in powers.items():
+        by_lower = {str(key).lower(): value for key, value in values.items()}
+        if str(by_lower.get('type', '')).lower() not in {'paradrop', 'amerparadrop'}:
+            continue
+        for country, parent in parents.items():
+            current = parent.upper()
+            visited = {country}
+            while current and current not in visited:
+                visited.add(current)
+                prefix = f'paradrop.{current.lower()}.'
+                inherited = {
+                    str(key)[len(prefix):]: value
+                    for key, value in values.items()
+                    if str(key).lower().startswith(prefix)
+                }
+                if inherited:
+                    for suffix, value in inherited.items():
+                        field = f'ParaDrop.{country_names[country]}.{suffix}'
+                        if field.lower() not in by_lower:
+                            updates.setdefault(section, {})[field] = value
+                    break
+                current = parents.get(current, '').upper()
+    return updates
+
+
 def portable_structure_reference_rules(
     sections, clone_handled, owned_clone_ids, *,
     secret_lab_access=False, direct_rejuvenator_access=False,
@@ -99,6 +138,8 @@ def portable_structure_reference_rules(
             ))
             if resolved != str(raw):
                 updates.setdefault(section, {})[field] = resolved
+    for section, values in _inherited_paradrop_rules(sections, private_sections).items():
+        updates.setdefault(section, {}).update(values)
 
     if secret_lab_access:
         lab = clones.get(LAB_ID)
